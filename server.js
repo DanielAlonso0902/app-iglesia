@@ -84,6 +84,93 @@ function puedeVerGrupo(grupoId, usuario) {
   return false;
 }
 
+function puedeVerPersona(personaId, usuario) {
+  if (usuario.rol === 'Administrador' || usuario.rol === 'Pastor') {
+    return true;
+  }
+
+  const grupos = db.prepare('SELECT grupo_id FROM persona_grupo WHERE persona_id = ? AND activo = 1').all(personaId);
+
+  return grupos.some((pertenencia) => puedeVerGrupo(pertenencia.grupo_id, usuario));
+}
+
+const etapasFormacion = ['Discípulo S1', 'Discípulo S2', 'Discípulo S3', 'Discípulo S4', 'Bendición N1', 'Bendición N2', 'Bendición N3', 'Ministerio de la Misericordia'];
+
+app.get('/api/personas/:id', requiereSesion, (req, res) => {
+  const personaId = Number(req.params.id);
+  const persona = db.prepare('SELECT * FROM personas WHERE id = ?').get(personaId);
+
+  if (!persona) {
+    res.status(404).json({ error: 'Persona no encontrada.' });
+    return;
+  }
+
+  if (!puedeVerPersona(personaId, req.usuario)) {
+    res.status(403).json({ error: 'No puedes consultar esta persona.' });
+    return;
+  }
+
+  const formacion = db.prepare(`
+    SELECT * FROM proceso_formacion
+    WHERE persona_id = ?
+    ORDER BY fecha_inicio, id
+  `).all(personaId);
+
+  res.json({ persona, formacion });
+});
+
+app.post('/api/personas/:id/formacion/avanzar', requiereSesion, requiereRol(['Administrador', 'Pastor', 'Líder de Red', 'Líder de Grupo']), (req, res) => {
+  const personaId = Number(req.params.id);
+  const persona = db.prepare('SELECT id FROM personas WHERE id = ?').get(personaId);
+
+  if (!persona) {
+    res.status(404).json({ error: 'Persona no encontrada.' });
+    return;
+  }
+
+  if (!puedeVerPersona(personaId, req.usuario)) {
+    res.status(403).json({ error: 'No puedes gestionar esta persona.' });
+    return;
+  }
+
+  const etapa = req.body.etapa;
+  const promedio = req.body.promedio === undefined || req.body.promedio === '' ? null : Number(req.body.promedio);
+
+  if (!etapasFormacion.includes(etapa)) {
+    res.status(400).json({ error: 'La etapa de formación no es válida.' });
+    return;
+  }
+
+  if (promedio !== null && (isNaN(promedio) || promedio < 0 || promedio > 5)) {
+    res.status(400).json({ error: 'El promedio debe estar entre 0 y 5.' });
+    return;
+  }
+
+  const transicion = db.transaction(() => {
+    const hoy = new Date().toISOString().slice(0, 10);
+
+    db.prepare(`
+      UPDATE proceso_formacion
+      SET fecha_fin = ?, activo = 0
+      WHERE persona_id = ? AND activo = 1
+    `).run(hoy, personaId);
+
+    const resultado = db.prepare(`
+      INSERT INTO proceso_formacion (persona_id, etapa, promedio, fecha_inicio, activo)
+      VALUES (?, ?, ?, ?, 1)
+    `).run(personaId, etapa, promedio, hoy);
+
+    return Number(resultado.lastInsertRowid);
+  });
+
+  try {
+    const id = transicion();
+    res.status(201).json({ id, etapa, promedio });
+  } catch (e) {
+    res.status(409).json({ error: 'La persona ya registró esa etapa.' });
+  }
+});
+
 app.post('/api/login', (req, res) => {
   const cedula = req.body.cedula;
   const contrasena = req.body.contrasena;

@@ -38,7 +38,16 @@ let pantalla = 'redes';
 let redActual = null;
 let grupoActual = null;
 let reunionActual = null;
+let personaExpedienteId = null;
 let usuarioActual = null;
+
+const etapasFormacion = ['Discípulo S1', 'Discípulo S2', 'Discípulo S3', 'Discípulo S4', 'Bendición N1', 'Bendición N2', 'Bendición N3', 'Ministerio de la Misericordia'];
+
+function clasePorEtapa(etapa) {
+  if (etapa.indexOf('Discípulo') === 0) return 'discipulo';
+  if (etapa.indexOf('Bendición') === 0) return 'bendicion';
+  return 'misericordia';
+}
 
 async function iniciar() {
   const respuesta = await fetch('/api/me');
@@ -162,6 +171,11 @@ async function verIntegrantesDeGrupo() {
       '<div class="avatar">' + persona.nombre_completo.charAt(0) + '</div>' +
       '<div class="info"><strong>' + persona.nombre_completo + '</strong></div>' +
       '<span class="rol rol-' + clasePorRol(persona.rol) + '">' + persona.rol + '</span>';
+
+    fila.addEventListener('click', () => {
+      pedirExpediente(persona.id, persona.nombre_completo);
+    });
+
     contenedorDetalle.appendChild(fila);
   });
 
@@ -443,8 +457,116 @@ function clasePorRol(rol) {
   return 'integrante';
 }
 
+async function pedirExpediente(personaId, nombre) {
+  const respuesta = await fetch('/api/personas/' + personaId);
+  const datos = await respuesta.json();
+
+  if (!respuesta.ok) {
+    tituloPagina.textContent = nombre;
+    contenedorDetalle.innerHTML = '<p class="vacio">' + (datos.error || 'No tienes permiso.') + '</p>';
+    return;
+  }
+
+  renderizarExpediente(datos.persona, datos.formacion);
+}
+
+function renderizarExpediente(persona, formacion) {
+  pantalla = 'expediente';
+  personaExpedienteId = persona.id;
+  tituloPagina.textContent = persona.nombre_completo;
+  botonAgregar.classList.add('oculto');
+  formularioSection.classList.add('oculto');
+  ocultarReuniones();
+
+  const puedeGestionar = usuarioActual && (usuarioActual.rol === 'Administrador' || usuarioActual.rol === 'Pastor' || usuarioActual.rol === 'Líder de Red' || usuarioActual.rol === 'Líder de Grupo');
+
+  const activa = formacion.find((fila) => fila.activo === 1);
+  const historial = formacion.slice().reverse();
+
+  let html = '<section class="tarjeta tarjeta-persona">';
+  html += '<strong>' + persona.nombre_completo + '</strong>';
+  html += '<span>Celular: ' + (persona.celular || 'no registrado') + '</span>';
+  html += '<span>' + (persona.es_nuevo ? 'Nuevo en la iglesia' : 'Miembro') + ' · ' + (persona.bautizado ? 'Bautizado' : 'Sin bautismo') + '</span>';
+  if (persona.fecha_llegada_grupo) {
+    html += '<span>Llegó al grupo: ' + persona.fecha_llegada_grupo + '</span>';
+  }
+  html += '</section>';
+
+  html += '<h3>Formación</h3>';
+
+  if (activa) {
+    html += '<p class="tarjeta tarjeta-persona">' +
+      '<span class="rol rol-etapa rol-' + clasePorEtapa(activa.etapa) + '">' + activa.etapa + '</span> ' +
+      '<span>Etapa actual</span></p>';
+  }
+
+  if (historial.length > 0) {
+    historial.forEach((fila) => {
+      html += '<article class="tarjeta tarjeta-persona">' +
+        '<strong>' + fila.etapa + '</strong>' +
+        '<span>Promedio: ' + (fila.promedio === null ? '—' : fila.promedio) +
+        ' · Desde ' + (fila.fecha_inicio || '?') +
+        (fila.fecha_fin ? ' hasta ' + fila.fecha_fin : '') +
+        (fila.activo === 1 ? ' · ACTUAL' : '') +
+        '</span></article>';
+    });
+  } else {
+    html += '<p class="vacio">Esta persona aún no inicia su formación.</p>';
+  }
+
+  if (puedeGestionar) {
+    html +=
+      '<form id="formulario-avance">' +
+      '<h4>Avanzar etapa</h4>' +
+      '<label for="etapa-avance">Nueva etapa</label>' +
+      '<select id="etapa-avance">' + etapasFormacion.map((etapa) => '<option' + (activa && etapa === activa.etapa ? ' selected' : '') + '>' + etapa + '</option>').join('') + '</select>' +
+      '<label for="promedio-avance">Promedio (0 a 5)</label>' +
+      '<input type="number" id="promedio-avance" min="0" max="5" step="0.1" placeholder="Opcional">' +
+      '<p id="mensaje-error-avance" class="alerta oculto"></p>' +
+      '<div class="botones"><button type="submit" class="btn btn-primario">Guardar avance</button></div>' +
+      '</form>';
+  }
+
+  contenedorDetalle.innerHTML = html;
+  contenedorRedes.classList.add('oculto');
+  contenedorDetalle.classList.remove('oculto');
+  botonVolver.classList.remove('oculto');
+
+  if (puedeGestionar) {
+    document.querySelector('#formulario-avance').addEventListener('submit', avanzarEtapa);
+  }
+}
+
+async function avanzarEtapa(evento) {
+  evento.preventDefault();
+
+  const mensaje = document.querySelector('#mensaje-error-avance');
+  mensaje.classList.add('oculto');
+
+  const datos = {
+    etapa: document.querySelector('#etapa-avance').value,
+    promedio: document.querySelector('#promedio-avance').value
+  };
+
+  const respuesta = await fetch('/api/personas/' + personaExpedienteId + '/formacion/avanzar', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(datos)
+  });
+
+  const resultado = await respuesta.json();
+
+  if (!respuesta.ok) {
+    mensaje.textContent = resultado.error;
+    mensaje.classList.remove('oculto');
+    return;
+  }
+
+  pedirExpediente(personaExpedienteId, tituloPagina.textContent);
+}
+
 function volver() {
-  if (pantalla === 'reunion') {
+  if (pantalla === 'expediente' || pantalla === 'reunion') {
     verIntegrantesDeGrupo();
   } else if (pantalla === 'integrantes') {
     verGruposDeRed();
