@@ -164,20 +164,28 @@
         </form>
       </section>
 
-      <h3 id="titulo-reuniones" class="oculto">Reuniones</h3>
-      <section id="lista-reuniones"></section>
+      <details id="acordeon-reuniones" class="acordeon oculto">
+        <summary>Reuniones</summary>
+        <div class="contenido-acordeon">
+          <section id="lista-reuniones"></section>
+        </div>
+      </details>
 
       <section id="lista-redes"></section>
 
       <section id="seccion-cambio-lider-red" class="oculto">
-        <h4>Cambiar líder de red</h4>
-        <form id="formulario-cambio-lider-red">
-          <label for="cambio-red">Red</label>
-          <select id="cambio-red" name="red_id" required></select>
-          <label for="cambio-lider-persona">Nuevo líder</label>
-          <select id="cambio-lider-persona" name="persona_id" required></select>
-          <div class="botones"><button type="submit" class="btn btn-primario">Transferir</button></div>
-        </form>
+        <details class="acordeon">
+          <summary>Cambiar líder de red</summary>
+          <div class="contenido-acordeon">
+            <form id="formulario-cambio-lider-red">
+              <label for="cambio-red">Red</label>
+              <select id="cambio-red" name="red_id" required></select>
+              <label for="cambio-lider-persona">Nuevo líder</label>
+              <select id="cambio-lider-persona" name="persona_id" required></select>
+              <div class="botones"><button type="submit" class="btn btn-primario">Transferir</button></div>
+            </form>
+          </div>
+        </details>
       </section>
 
       <section id="detalle" class="oculto"></section>
@@ -202,93 +210,157 @@
       <section id="seccion-admin" class="oculto">
         <p id="mensaje-error-admin" class="alerta oculto"></p>
 
-        <form id="formulario-nueva-red">
-          <h4>Crear red</h4>
-          <label for="nombre-red">Nombre</label>
-          <input type="text" id="nombre-red" name="nombre" placeholder="Ej. Damas" required>
-          <div class="botones"><button type="submit" class="btn btn-primario">Crear red</button></div>
-        </form>
-
-        <form id="formulario-nuevo-grupo">
-          <h4>Crear grupo</h4>
-          <label for="grupo-red">Red</label>
-          <select id="grupo-red" name="red_id" required></select>
-          <label for="grupo-nombre">Nombre</label>
-          <input type="text" id="grupo-nombre" name="nombre" placeholder="Ej. Grupo #300" required>
-          <label for="grupo-dia">Día habitual</label>
-          <select id="grupo-dia" name="dia_habitual" required>
-            <option value="" disabled selected>Elegir día…</option>
-            <option>Lunes</option>
-            <option>Martes</option>
-            <option>Miércoles</option>
-            <option>Jueves</option>
-            <option>Viernes</option>
-            <option>Sábado</option>
-            <option>Domingo</option>
-          </select>
-          <label for="grupo-hora">Hora habitual</label>
-          <div class="fila-hora">
-            <select id="grupo-hora" name="hora_habitual" required>
-              <option value="" disabled selected>Elegir hora…</option>
-            </select>
-            <select id="grupo-hora-periodo" name="hora_habitual_periodo">
-              <option>AM</option>
-              <option>PM</option>
-            </select>
+        <details class="acordeon">
+          <summary>Crear red</summary>
+          <div class="contenido-acordeon">
+            <form id="formulario-nueva-red">
+              <label for="nombre-red">Nombre</label>
+              <input type="text" id="nombre-red" name="nombre" placeholder="Ej. Damas" required>
+              <div class="botones"><button type="submit" class="btn btn-primario">Crear red</button></div>
+            </form>
           </div>
-          <label for="grupo-direccion">Dirección</label>
-          <input type="text" id="grupo-direccion" name="direccion">
-          <label for="grupo-barrio">Barrio</label>
-          <input type="text" id="grupo-barrio" name="barrio">
-          <label for="grupo-ciudad">Ciudad</label>
-          <input type="text" id="grupo-ciudad" name="ciudad">
-          <div class="botones"><button type="submit" class="btn btn-primario">Crear grupo</button></div>
-        </form>
+        </details>
 
-        <h4>Redes existentes</h4>
-        <section id="lista-admin-redes"></section>
-
-        <h4>Grupos existentes</h4>
-        <section id="lista-admin-grupos"></section>
-
-        <h4>Usuarios</h4>
-        <form id="formulario-usuario">
-          <label for="usuario-persona">Persona</label>
-          <select id="usuario-persona" name="persona_id" required></select>
-
-          <div id="campo-persona-nueva" class="oculto">
-            <label for="usuario-persona-nueva">Nombre de la persona nueva</label>
-            <input type="text" id="usuario-persona-nueva" name="nombre_persona" placeholder="Ej. Daniel Rojas">
+        <details class="acordeon">
+          <summary>Crear grupo</summary>
+          <div class="contenido-acordeon">
+            <form id="formulario-nuevo-grupo">
+              <label for="grupo-red">Red</label>
+              <select id="grupo-red" name="red_id" required></select>
+              <label for="grupo-nombre">Nombre</label>
+              <input type="text" id="grupo-nombre" name="nombre" placeholder="Ej. Grupo #300" required>
+              <label for="grupo-dia">Día habitual</label>
+              <select id="grupo-dia" name="dia_habitual" required>
+                <option value="" disabled selected>Elegir día…</option>
+                <option>Lunes</option>
+                <option>Martes</option>
+                <option>Miércoles</option>
+                <option>Jueves</option>
+                <option>Viernes</option>
+                <option>Sábado</option>
+                <option>Domingo</option>
+              </select>
+              <label for="grupo-hora">Hora habitual</label>
+              <div class="fila-hora">
+                <select id="grupo-hora" name="hora_habitual" required>
+                  <option value="" disabled selected>Elegir hora…</option>
+                </select>
+                <select id="grupo-hora-periodo" name="hora_habitual_periodo">
+                  <option>AM</option>
+                  <option>PM</option>
+                </select>
+              </div>
+              <label for="grupo-direccion">Dirección</label>
+              <input type="text" id="grupo-direccion" name="direccion">
+              <label for="grupo-barrio">Barrio</label>
+              <input type="text" id="grupo-barrio" name="barrio">
+              <label for="grupo-ciudad">Ciudad</label>
+              <input type="text" id="grupo-ciudad" name="ciudad">
+              <div class="botones"><button type="submit" class="btn btn-primario">Crear grupo</button></div>
+            </form>
           </div>
+        </details>
 
-          <label for="usuario-rol">Rol</label>
-          <select id="usuario-rol" name="rol" required>
-            <option value="Líder de Red">Líder de Red</option>
-            <option value="Líder de Grupo">Líder de Grupo</option>
-            <option value="Pastor">Pastor</option>
-            <option value="Administrador">Administrador</option>
-          </select>
-
-          <div id="campo-red-usuario" class="oculto">
-            <label for="usuario-red">Red</label>
-            <select id="usuario-red" name="red_id"></select>
+        <details class="acordeon" open>
+          <summary>Redes existentes</summary>
+          <div class="contenido-acordeon">
+            <section id="lista-admin-redes"></section>
           </div>
+        </details>
 
-          <div id="campo-grupo-usuario" class="oculto">
-            <label for="usuario-grupo">Grupo</label>
-            <select id="usuario-grupo" name="grupo_id"></select>
+        <details class="acordeon" open>
+          <summary>Grupos existentes</summary>
+          <div class="contenido-acordeon">
+            <section id="lista-admin-grupos"></section>
+
+            <form id="formulario-editar-grupo" class="oculto">
+              <h4>Editar grupo</h4>
+              <label for="editar-grupo-nombre">Nombre</label>
+              <input type="text" id="editar-grupo-nombre" name="nombre" required>
+
+              <label for="editar-grupo-dia">Día habitual</label>
+              <select id="editar-grupo-dia" name="dia_habitual">
+                <option value="">Elegir día…</option>
+                <option>Lunes</option>
+                <option>Martes</option>
+                <option>Miércoles</option>
+                <option>Jueves</option>
+                <option>Viernes</option>
+                <option>Sábado</option>
+                <option>Domingo</option>
+              </select>
+
+              <label for="editar-grupo-hora">Hora habitual</label>
+              <div class="fila-hora">
+                <select id="editar-grupo-hora" name="hora_habitual"></select>
+                <select id="editar-grupo-hora-periodo" name="hora_habitual_periodo">
+                  <option>AM</option>
+                  <option>PM</option>
+                </select>
+              </div>
+
+              <label for="editar-grupo-duracion">Duración habitual</label>
+              <input type="text" id="editar-grupo-duracion" name="duracion_habitual" placeholder="Ej. 1 hora 45 minutos">
+
+              <label for="editar-grupo-direccion">Dirección</label>
+              <input type="text" id="editar-grupo-direccion" name="direccion">
+
+              <label for="editar-grupo-barrio">Barrio</label>
+              <input type="text" id="editar-grupo-barrio" name="barrio">
+
+              <label for="editar-grupo-ciudad">Ciudad</label>
+              <input type="text" id="editar-grupo-ciudad" name="ciudad">
+
+              <div class="botones">
+                <button type="submit" class="btn btn-primario">Guardar cambios</button>
+                <button type="button" id="cancelar-editar-grupo" class="btn">Cancelar</button>
+              </div>
+            </form>
           </div>
+        </details>
 
-          <label for="usuario-cedula">Cédula</label>
-          <input type="text" id="usuario-cedula" name="cedula" placeholder="Ej. 1045678901" required>
+        <details class="acordeon">
+          <summary>Usuarios</summary>
+          <div class="contenido-acordeon">
+            <form id="formulario-usuario">
+              <label for="usuario-persona">Persona</label>
+              <select id="usuario-persona" name="persona_id" required></select>
 
-          <label for="usuario-contrasena">Contraseña</label>
-          <input type="password" id="usuario-contrasena" name="contrasena" placeholder="Mínimo 6 caracteres" required>
+              <div id="campo-persona-nueva" class="oculto">
+                <label for="usuario-persona-nueva">Nombre de la persona nueva</label>
+                <input type="text" id="usuario-persona-nueva" name="nombre_persona" placeholder="Ej. Daniel Rojas">
+              </div>
 
-          <div class="botones"><button type="submit" class="btn btn-primario">Crear usuario</button></div>
-        </form>
+              <label for="usuario-rol">Rol</label>
+              <select id="usuario-rol" name="rol" required>
+                <option value="Líder de Red">Líder de Red</option>
+                <option value="Líder de Grupo">Líder de Grupo</option>
+                <option value="Pastor">Pastor</option>
+                <option value="Administrador">Administrador</option>
+              </select>
 
-        <section id="lista-usuarios"></section>
+              <div id="campo-red-usuario" class="oculto">
+                <label for="usuario-red">Red</label>
+                <select id="usuario-red" name="red_id"></select>
+              </div>
+
+              <div id="campo-grupo-usuario" class="oculto">
+                <label for="usuario-grupo">Grupo</label>
+                <select id="usuario-grupo" name="grupo_id"></select>
+              </div>
+
+              <label for="usuario-cedula">Cédula</label>
+              <input type="text" id="usuario-cedula" name="cedula" placeholder="Ej. 1045678901" required>
+
+              <label for="usuario-contrasena">Contraseña</label>
+              <input type="password" id="usuario-contrasena" name="contrasena" placeholder="Mínimo 6 caracteres" required>
+
+              <div class="botones"><button type="submit" class="btn btn-primario">Crear usuario</button></div>
+            </form>
+
+            <section id="lista-usuarios"></section>
+          </div>
+        </details>
       </section>
     </div>
   </main>

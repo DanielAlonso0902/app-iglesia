@@ -19,7 +19,7 @@ const formularioReunionSection = document.querySelector('#formulario-reunion-sec
 const formularioReunion = document.querySelector('#formulario-reunion');
 const botonCancelarReunion = document.querySelector('#cancelar-reunion');
 const mensajeErrorReunion = document.querySelector('#mensaje-error-reunion');
-const tituloReuniones = document.querySelector('#titulo-reuniones');
+const tituloReuniones = document.querySelector('#acordeon-reuniones');
 const listaReuniones = document.querySelector('#lista-reuniones');
 
 const formularioEditarReunionSection = document.querySelector('#formulario-editar-reunion-section');
@@ -51,6 +51,8 @@ const formularioNuevoGrupo = document.querySelector('#formulario-nuevo-grupo');
 const selectGrupoRed = document.querySelector('#grupo-red');
 const listaAdminRedes = document.querySelector('#lista-admin-redes');
 const listaAdminGrupos = document.querySelector('#lista-admin-grupos');
+const formularioEditarGrupo = document.querySelector('#formulario-editar-grupo');
+const cancelarEditarGrupo = document.querySelector('#cancelar-editar-grupo');
 
 const formularioUsuario = document.querySelector('#formulario-usuario');
 const selectUsuarioPersona = document.querySelector('#usuario-persona');
@@ -1272,11 +1274,79 @@ function renderAdminGrupos(grupos) {
     tarjeta.className = 'tarjeta tarjeta-persona';
     tarjeta.innerHTML = '<strong>' + grupo.nombre + '</strong>' +
       '<span>' + grupo.red + (grupo.activo === 1 ? ' · Activo' : ' · Inactivo') + '</span>' +
-      (grupo.activo === 1 ? '<button class="btn btn-borde-rojo">Desactivar</button>' : '<button class="btn btn-secundario">Activar</button>');
+      (grupo.activo === 1 ? '<button class="btn btn-borde-rojo">Desactivar</button>' : '<button class="btn btn-secundario">Activar</button>') +
+      '<button class="btn btn-secundario">Editar</button>';
 
-    tarjeta.querySelector('button').addEventListener('click', () => cambiarEstadoGrupo(grupo.id, grupo.activo === 1 ? 0 : 1));
+    const botones = tarjeta.querySelectorAll('button');
+    if (grupo.activo === 1) {
+      botones[0].addEventListener('click', () => cambiarEstadoGrupo(grupo.id, 0));
+    } else {
+      botones[0].addEventListener('click', () => cambiarEstadoGrupo(grupo.id, 1));
+    }
+    botones[1].addEventListener('click', () => abrirFormularioEditarGrupo(grupo));
     listaAdminGrupos.appendChild(tarjeta);
   });
+}
+
+let grupoEnEdicion = null;
+
+function abrirFormularioEditarGrupo(grupo) {
+  grupoEnEdicion = grupo.id;
+  mensajeErrorAdmin.classList.add('oculto');
+
+  const partesHora = (grupo.hora_habitual || '').split(' ');
+  const hora = partesHora[0] || '';
+  const periodo = partesHora[1] || 'PM';
+
+  formularioEditarGrupo.nombre.value = grupo.nombre;
+  formularioEditarGrupo.dia_habitual.value = grupo.dia_habitual || '';
+  formularioEditarGrupo.hora_habitual.value = hora;
+  formularioEditarGrupo.hora_habitual_periodo.value = periodo;
+  formularioEditarGrupo.duracion_habitual.value = grupo.duracion_habitual || '';
+  formularioEditarGrupo.direccion.value = grupo.direccion || '';
+  formularioEditarGrupo.barrio.value = grupo.barrio || '';
+  formularioEditarGrupo.ciudad.value = grupo.ciudad || '';
+
+  formularioEditarGrupo.classList.remove('oculto');
+  formularioEditarGrupo.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function cerrarFormularioEditarGrupo() {
+  formularioEditarGrupo.classList.add('oculto');
+  formularioEditarGrupo.reset();
+  grupoEnEdicion = null;
+}
+
+async function guardarEdicionGrupo(evento) {
+  evento.preventDefault();
+  mensajeErrorAdmin.classList.add('oculto');
+
+  const datos = {
+    nombre: formularioEditarGrupo.nombre.value,
+    dia_habitual: formularioEditarGrupo.dia_habitual.value,
+    hora_habitual: formularioEditarGrupo.hora_habitual.value + ' ' + formularioEditarGrupo.hora_habitual_periodo.value,
+    duracion_habitual: formularioEditarGrupo.duracion_habitual.value,
+    direccion: formularioEditarGrupo.direccion.value,
+    barrio: formularioEditarGrupo.barrio.value,
+    ciudad: formularioEditarGrupo.ciudad.value
+  };
+
+  const respuesta = await fetch('/api/grupos/' + grupoEnEdicion, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(datos)
+  });
+
+  const resultado = await respuesta.json();
+
+  if (!respuesta.ok) {
+    mensajeErrorAdmin.textContent = resultado.error;
+    mensajeErrorAdmin.classList.remove('oculto');
+    return;
+  }
+
+  cerrarFormularioEditarGrupo();
+  await cargarListasAdmin();
 }
 
 async function cambiarEstadoRed(redId, activo) {
@@ -1533,6 +1603,8 @@ formularioNuevoGrupo.addEventListener('submit', crearGrupo);
 formularioUsuario.addEventListener('submit', crearUsuario);
 selectUsuarioRol.addEventListener('change', actualizarCamposUsuario);
 selectUsuarioPersona.addEventListener('change', actualizarCamposUsuario);
+formularioEditarGrupo.addEventListener('submit', guardarEdicionGrupo);
+cancelarEditarGrupo.addEventListener('click', cerrarFormularioEditarGrupo);
 formularioCambioLiderRed.addEventListener('submit', transferirLiderRed);
 
 const horas = [];
@@ -1548,6 +1620,9 @@ horas.forEach((h) => {
     opcion.value = h + ':' + minuto;
     opcion.textContent = h + ':' + minuto;
     formularioNuevoGrupo.hora_habitual.appendChild(opcion);
+
+    const opcionEditar = opcion.cloneNode();
+    formularioEditarGrupo.hora_habitual.appendChild(opcionEditar);
   });
 });
 

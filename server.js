@@ -416,6 +416,51 @@ app.patch('/api/grupos/:id/estado', requiereSesion, requiereRol(['Administrador'
   res.json({ id: grupoId, activo });
 });
 
+app.patch('/api/grupos/:id', requiereSesion, requiereRol(['Administrador', 'Pastor']), (req, res) => {
+  const grupoId = Number(req.params.id);
+
+  if (!db.prepare('SELECT id FROM grupos WHERE id = ?').get(grupoId)) {
+    res.status(404).json({ error: 'Grupo no encontrado.' });
+    return;
+  }
+
+  const diasValidos = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+  const camposEscritos = ['nombre', 'dia_habitual', 'hora_habitual', 'duracion_habitual', 'direccion', 'barrio', 'ciudad', 'referencia']
+    .filter((campo) => req.body[campo] !== undefined);
+
+  const cambios = camposEscritos.map((campo) => [campo, req.body[campo] || null]);
+
+  if (cambios.length === 0) {
+    res.status(400).json({ error: 'No hay campos para actualizar.' });
+    return;
+  }
+
+  const valores = {};
+  for (const [campo, valor] of cambios) {
+    valores[campo] = valor;
+  }
+
+  if (valores.nombre !== null && !String(valores.nombre).trim()) {
+    res.status(400).json({ error: 'El nombre del grupo es obligatorio.' });
+    return;
+  }
+
+  if (valores.dia_habitual && !diasValidos.includes(valores.dia_habitual)) {
+    res.status(400).json({ error: 'El día habitual debe ser uno de la lista.' });
+    return;
+  }
+
+  if (valores.hora_habitual && !/^\d{1,2}:\d{2} (AM|PM)$/.test(valores.hora_habitual)) {
+    res.status(400).json({ error: 'La hora habitual debe ser como 5:30 PM.' });
+    return;
+  }
+
+  const asignaciones = cambios.map(([campo]) => campo + ' = ?').join(', ');
+  db.prepare('UPDATE grupos SET ' + asignaciones + ' WHERE id = ?').run(...cambios.map(([, valor]) => valor), grupoId);
+
+  res.json({ id: grupoId, mensaje: 'Grupo actualizado.' });
+});
+
 app.get('/api/usuarios', requiereSesion, requiereRol(['Administrador', 'Pastor']), (req, res) => {
   const usuarios = db.prepare(`
     SELECT usuarios.id, usuarios.cedula, usuarios.rol, usuarios.activo, personas.nombre_completo
