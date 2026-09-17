@@ -75,3 +75,33 @@ CREATE TABLE IF NOT EXISTS sesiones (
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
 );
+
+CREATE TABLE IF NOT EXISTS reuniones (
+  id INTEGER PRIMARY KEY,
+  grupo_id INTEGER NOT NULL,
+  fecha TEXT NOT NULL,
+  tipo TEXT NOT NULL DEFAULT 'Grupo habitual' CHECK (tipo IN ('Grupo habitual', 'Servicio de red', 'Actividad especial', 'Reunión cancelada')),
+  realizada INTEGER NOT NULL DEFAULT 1,
+  duracion TEXT,
+  observacion TEXT,
+  FOREIGN KEY (grupo_id) REFERENCES grupos(id)
+);
+
+CREATE TABLE IF NOT EXISTS asistencia_reunion (
+  id INTEGER PRIMARY KEY,
+  reunion_id INTEGER NOT NULL,
+  persona_id INTEGER NOT NULL,
+  asistio INTEGER NOT NULL DEFAULT 1,
+  UNIQUE (reunion_id, persona_id),
+  FOREIGN KEY (reunion_id) REFERENCES reuniones(id),
+  FOREIGN KEY (persona_id) REFERENCES personas(id)
+);
+
+CREATE TABLE IF NOT EXISTS visitantes (
+  id INTEGER PRIMARY KEY,
+  reunion_id INTEGER NOT NULL,
+  nombre TEXT NOT NULL,
+  telefono TEXT,
+  observacion TEXT,
+  FOREIGN KEY (reunion_id) REFERENCES reuniones(id)
+);
