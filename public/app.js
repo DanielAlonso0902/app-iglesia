@@ -17,6 +17,15 @@ const mensajeErrorReunion = document.querySelector('#mensaje-error-reunion');
 const tituloReuniones = document.querySelector('#titulo-reuniones');
 const listaReuniones = document.querySelector('#lista-reuniones');
 
+const barraNavegacion = document.querySelector('#barra-navegacion');
+const botonRedes = document.querySelector('#boton-redes');
+const botonBuscar = document.querySelector('#boton-buscar');
+const seccionBusqueda = document.querySelector('#seccion-busqueda');
+const formularioBusqueda = document.querySelector('#formulario-busqueda');
+const campoBusqueda = document.querySelector('#campo-busqueda');
+const mensajeBusqueda = document.querySelector('#mensaje-busqueda');
+const resultados = document.querySelector('#resultados');
+
 const loginSection = document.querySelector('#login-section');
 const areaApp = document.querySelector('#area-app');
 const formularioLogin = document.querySelector('#formulario-login');
@@ -46,6 +55,7 @@ function mostrarLogin() {
   loginSection.classList.remove('oculto');
   areaApp.classList.add('oculto');
   usuarioBarra.classList.add('oculto');
+  barraNavegacion.classList.add('oculto');
 }
 
 function mostrarApp(usuario) {
@@ -53,6 +63,7 @@ function mostrarApp(usuario) {
   loginSection.classList.add('oculto');
   areaApp.classList.remove('oculto');
   usuarioBarra.classList.remove('oculto');
+  barraNavegacion.classList.remove('oculto');
   textoUsuario.textContent = 'Cédula ' + usuario.cedula + ' · ' + usuario.rol;
   cargarRedes();
 }
@@ -451,6 +462,70 @@ function mostrarRedes() {
   botonAgregar.classList.add('oculto');
   formularioSection.classList.add('oculto');
   ocultarReuniones();
+  seccionBusqueda.classList.add('oculto');
+  resultados.innerHTML = '';
+  botonRedes.classList.add('activo');
+  botonBuscar.classList.remove('activo');
+}
+
+function mostrarBusqueda() {
+  pantalla = 'busqueda';
+  tituloPagina.textContent = 'Buscar personas';
+  contenedorRedes.classList.add('oculto');
+  contenedorDetalle.classList.add('oculto');
+  botonVolver.classList.add('oculto');
+  botonAgregar.classList.add('oculto');
+  formularioSection.classList.add('oculto');
+  ocultarReuniones();
+  seccionBusqueda.classList.remove('oculto');
+  mensajeBusqueda.classList.add('oculto');
+  resultados.innerHTML = '';
+  botonBuscar.classList.add('activo');
+  botonRedes.classList.remove('activo');
+  campoBusqueda.focus();
+}
+
+async function buscarPersonas(evento) {
+  evento.preventDefault();
+  mensajeBusqueda.classList.add('oculto');
+  resultados.innerHTML = '';
+
+  const q = campoBusqueda.value.trim();
+  const respuesta = await fetch('/api/personas?q=' + encodeURIComponent(q));
+  const personas = await respuesta.json();
+
+  if (!respuesta.ok) {
+    mensajeBusqueda.textContent = personas.error;
+    mensajeBusqueda.classList.remove('oculto');
+    return;
+  }
+
+  if (personas.length === 0) {
+    mensajeBusqueda.textContent = 'No se encontraron personas con "' + q + '".';
+    mensajeBusqueda.classList.remove('oculto');
+    return;
+  }
+
+  renderizarResultados(personas);
+}
+
+function renderizarResultados(personas) {
+  resultados.innerHTML = '';
+
+  personas.forEach((persona) => {
+    const tarjeta = document.createElement('article');
+    tarjeta.className = 'tarjeta tarjeta-persona';
+
+    let contenido = '<strong>' + persona.nombre_completo + (persona.persona_activo ? '' : ' (inactivo)') + '</strong>';
+    if (persona.cedula) {
+      contenido += '<span>Cédula: ' + persona.cedula + '</span>';
+    }
+    contenido += '<span>' + (persona.celular || 'sin celular') + '</span>';
+    contenido += '<div>' + persona.grupos.map((grupo) => '<span class="rol rol-' + clasePorRol(grupo.rol) + '">' + grupo.nombre + ' · ' + grupo.rol + '</span>').join('') + '</div>';
+
+    tarjeta.innerHTML = contenido;
+    resultados.appendChild(tarjeta);
+  });
 }
 
 formularioLogin.addEventListener('submit', async (evento) => {
@@ -493,5 +568,9 @@ formulario.addEventListener('submit', crearIntegrante);
 botonAgregarReunion.addEventListener('click', abrirFormularioReunion);
 botonCancelarReunion.addEventListener('click', cerrarFormularioReunion);
 formularioReunion.addEventListener('submit', crearReunion);
+
+formularioBusqueda.addEventListener('submit', buscarPersonas);
+botonBuscar.addEventListener('click', mostrarBusqueda);
+botonRedes.addEventListener('click', mostrarRedes);
 
 iniciar();

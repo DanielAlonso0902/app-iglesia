@@ -36,6 +36,11 @@
     </section>
 
     <div id="area-app" class="oculto">
+      <nav id="barra-navegacion" class="oculto">
+        <button id="boton-redes" class="btn-bar">Redes</button>
+        <button id="boton-buscar" class="btn-bar">Buscar</button>
+      </nav>
+
       <button id="boton-volver" class="oculto">← Volver</button>
       <h2 id="titulo-pagina">Nuestras Redes</h2>
 
@@ -95,6 +100,15 @@
 
       <section id="lista-redes"></section>
       <section id="detalle" class="oculto"></section>
+
+      <section id="seccion-busqueda" class="oculto">
+        <form id="formulario-busqueda">
+          <input type="search" id="campo-busqueda" name="q" placeholder="Nombre, cédula o celular" required>
+          <button type="submit" class="btn btn-primario boton-ancho">Buscar</button>
+        </form>
+        <p id="mensaje-busqueda" class="vacio oculto"></p>
+        <section id="resultados"></section>
+      </section>
     </div>
   </main>
 

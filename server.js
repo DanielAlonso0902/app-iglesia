@@ -163,8 +163,40 @@ app.get('/api/grupos/:id/integrantes', requiereSesion, (req, res) => {
   res.json(integrantes);
 });
 
-app.get('/api/personas', (req, res) => {
-  const personas = db.prepare('SELECT * FROM personas ORDER BY nombre_completo').all();
+app.get('/api/personas', requiereSesion, (req, res) => {
+  const q = (req.query.q || '').trim();
+  const busqueda = '%' + q + '%';
+
+  let personas;
+  if (q) {
+    personas = db.prepare(`
+      SELECT p.id, p.nombre_completo, p.celular, p.activo AS persona_activo, u.cedula
+      FROM personas p
+      LEFT JOIN usuarios u ON u.persona_id = p.id
+      WHERE p.nombre_completo LIKE ? OR p.celular LIKE ? OR u.cedula LIKE ?
+      ORDER BY p.nombre_completo
+      LIMIT 50
+    `).all(busqueda, busqueda, busqueda);
+  } else {
+    personas = db.prepare(`
+      SELECT p.id, p.nombre_completo, p.celular, p.activo AS persona_activo, u.cedula
+      FROM personas p
+      LEFT JOIN usuarios u ON u.persona_id = p.id
+      ORDER BY p.nombre_completo
+      LIMIT 50
+    `).all();
+  }
+
+  for (const persona of personas) {
+    persona.grupos = db.prepare(`
+      SELECT g.nombre, pg.rol
+      FROM persona_grupo pg
+      JOIN grupos g ON g.id = pg.grupo_id
+      WHERE pg.persona_id = ? AND pg.activo = 1
+      ORDER BY g.nombre
+    `).all(persona.id);
+  }
+
   res.json(personas);
 });
 
