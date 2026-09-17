@@ -1,6 +1,7 @@
 CREATE TABLE IF NOT EXISTS redes (
   id INTEGER PRIMARY KEY,
-  nombre TEXT NOT NULL
+  nombre TEXT NOT NULL,
+  activo INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE TABLE IF NOT EXISTS grupos (
@@ -14,6 +15,7 @@ CREATE TABLE IF NOT EXISTS grupos (
   barrio TEXT,
   ciudad TEXT,
   referencia TEXT,
+  activo INTEGER NOT NULL DEFAULT 1,
   FOREIGN KEY (red_id) REFERENCES redes(id)
 );
 

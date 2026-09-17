@@ -192,13 +192,13 @@ app.get('/api/mis-redes', requiereSesion, (req, res) => {
   let redes;
 
   if (req.usuario.rol === 'Administrador' || req.usuario.rol === 'Pastor') {
-    redes = db.prepare('SELECT * FROM redes ORDER BY nombre').all();
+    redes = db.prepare('SELECT * FROM redes WHERE activo = 1 ORDER BY nombre').all();
   } else {
     redes = db.prepare(`
       SELECT redes.*
       FROM redes
       JOIN persona_red pr ON pr.red_id = redes.id
-      WHERE pr.persona_id = ? AND pr.activo = 1
+      WHERE pr.persona_id = ? AND pr.activo = 1 AND redes.activo = 1
       ORDER BY redes.nombre
     `).all(req.usuario.persona_id);
   }
@@ -220,7 +220,7 @@ app.get('/api/reportes/red/:id', requiereSesion, (req, res) => {
     return;
   }
 
-  const grupos = db.prepare('SELECT id, nombre FROM grupos WHERE red_id = ? ORDER BY nombre').all(redId);
+  const grupos = db.prepare('SELECT id, nombre FROM grupos WHERE red_id = ? AND activo = 1 ORDER BY nombre').all(redId);
 
   const porGrupo = grupos.map((grupo) => ({
     id: grupo.id,
@@ -236,7 +236,7 @@ app.get('/api/reportes/red/:id', requiereSesion, (req, res) => {
     SELECT DISTINCT pg.persona_id
     FROM persona_grupo pg
     JOIN grupos g ON g.id = pg.grupo_id
-    WHERE g.red_id = ? AND pg.activo = 1
+    WHERE g.red_id = ? AND g.activo = 1 AND pg.activo = 1
   `).all(redId);
 
   const fichaPersona = db.prepare('SELECT es_nuevo, bautizado FROM personas WHERE id = ?');
@@ -292,6 +292,82 @@ app.get('/api/reportes/formacion', requiereSesion, requiereRol(['Administrador',
   res.json({ porEtapa, resumen });
 });
 
+app.post('/api/redes', requiereSesion, requiereRol(['Administrador', 'Pastor']), (req, res) => {
+  const nombre = req.body.nombre;
+
+  if (!nombre) {
+    res.status(400).json({ error: 'El nombre de la red es obligatorio.' });
+    return;
+  }
+
+  const resultado = db.prepare('INSERT INTO redes (nombre) VALUES (?)').run(nombre);
+  res.status(201).json({ id: Number(resultado.lastInsertRowid), nombre, activo: 1 });
+});
+
+app.patch('/api/redes/:id/estado', requiereSesion, requiereRol(['Administrador', 'Pastor']), (req, res) => {
+  const redId = Number(req.params.id);
+  const red = db.prepare('SELECT id FROM redes WHERE id = ?').get(redId);
+
+  if (!red) {
+    res.status(404).json({ error: 'Red no encontrada.' });
+    return;
+  }
+
+  const activo = req.body.activo ? 1 : 0;
+  db.prepare('UPDATE redes SET activo = ? WHERE id = ?').run(activo, redId);
+
+  res.json({ id: redId, activo });
+});
+
+app.post('/api/grupos', requiereSesion, requiereRol(['Administrador', 'Pastor']), (req, res) => {
+  const redId = Number(req.body.red_id);
+  const nombre = req.body.nombre;
+
+  if (!redId || !nombre) {
+    res.status(400).json({ error: 'La red y el nombre del grupo son obligatorios.' });
+    return;
+  }
+
+  const red = db.prepare('SELECT id FROM redes WHERE id = ? AND activo = 1').get(redId);
+
+  if (!red) {
+    res.status(400).json({ error: 'La red no existe o está inactiva.' });
+    return;
+  }
+
+  const resultado = db.prepare(`
+    INSERT INTO grupos (red_id, nombre, dia_habitual, hora_habitual, duracion_habitual, direccion, barrio, ciudad, referencia)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    redId,
+    nombre,
+    req.body.dia_habitual || null,
+    req.body.hora_habitual || null,
+    req.body.duracion_habitual || null,
+    req.body.direccion || null,
+    req.body.barrio || null,
+    req.body.ciudad || null,
+    req.body.referencia || null
+  );
+
+  res.status(201).json({ id: Number(resultado.lastInsertRowid), nombre });
+});
+
+app.patch('/api/grupos/:id/estado', requiereSesion, requiereRol(['Administrador', 'Pastor']), (req, res) => {
+  const grupoId = Number(req.params.id);
+  const grupo = db.prepare('SELECT id FROM grupos WHERE id = ?').get(grupoId);
+
+  if (!grupo) {
+    res.status(404).json({ error: 'Grupo no encontrado.' });
+    return;
+  }
+
+  const activo = req.body.activo ? 1 : 0;
+  db.prepare('UPDATE grupos SET activo = ? WHERE id = ?').run(activo, grupoId);
+
+  res.json({ id: grupoId, activo });
+});
+
 app.post('/api/login', (req, res) => {
   const cedula = req.body.cedula;
   const contrasena = req.body.contrasena;
@@ -329,15 +405,25 @@ app.post('/api/logout', (req, res) => {
 });
 
 app.get('/api/redes', requiereSesion, (req, res) => {
-  const redes = db.prepare('SELECT * FROM redes ORDER BY nombre').all();
+  const incluirInactivas = req.query.todas === '1' && (req.usuario.rol === 'Administrador' || req.usuario.rol === 'Pastor');
+
+  const redes = incluirInactivas
+    ? db.prepare('SELECT * FROM redes ORDER BY nombre').all()
+    : db.prepare('SELECT * FROM redes WHERE activo = 1 ORDER BY nombre').all();
+
   res.json(redes);
 });
 
 app.get('/api/grupos', requiereSesion, (req, res) => {
+  const incluirInactivos = req.query.todas === '1' && (req.usuario.rol === 'Administrador' || req.usuario.rol === 'Pastor');
+
+  const filtro = incluirInactivos ? '' : 'WHERE grupos.activo = 1 ';
+
   const grupos = db.prepare(`
     SELECT grupos.*, redes.nombre AS red
     FROM grupos
     JOIN redes ON redes.id = grupos.red_id
+    ${filtro}
     ORDER BY grupos.nombre
   `).all();
   res.json(grupos);
@@ -350,7 +436,7 @@ app.get('/api/redes/:id/grupos', requiereSesion, (req, res) => {
     SELECT grupos.*, redes.nombre AS red
     FROM grupos
     JOIN redes ON redes.id = grupos.red_id
-    WHERE grupos.red_id = ?
+    WHERE grupos.red_id = ? AND grupos.activo = 1
     ORDER BY grupos.nombre
   `).all(redId);
 

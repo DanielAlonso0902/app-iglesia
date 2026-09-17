@@ -211,6 +211,62 @@ footer {
   border-color: var(--azul-rey);
 }
 
+#formulario-nueva-red,
+#formulario-nuevo-grupo {
+  background-color: var(--blanco);
+  border: 1px solid #dbe3f0;
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+#formulario-nueva-red h4,
+#formulario-nuevo-grupo h4 {
+  margin: 0 0 0.25rem;
+  color: var(--azul-oscuro);
+}
+
+#formulario-nueva-red label,
+#formulario-nuevo-grupo label {
+  display: block;
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-bottom: 0.3rem;
+  margin-top: 0.9rem;
+}
+
+#formulario-nueva-red input,
+#formulario-nuevo-grupo input,
+#formulario-nuevo-grupo select {
+  width: 100%;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid #c6d0e2;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  font-family: inherit;
+  color: var(--texto);
+  background-color: var(--blanco);
+}
+
+#formulario-nueva-red input:focus,
+#formulario-nuevo-grupo input:focus,
+#formulario-nuevo-grupo select:focus {
+  outline: none;
+  border-color: var(--azul-rey);
+}
+
+.btn-borde-rojo {
+  background-color: transparent;
+  color: #b3261e;
+  border-color: #b3261e;
+  margin-top: 0.6rem;
+}
+
+.btn-borde-rojo:hover {
+  background-color: #b3261e;
+  color: var(--blanco);
+}
+
 .avatar {
   width: 2.75rem;
   height: 2.75rem;

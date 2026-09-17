@@ -33,6 +33,15 @@ const reporteFormacion = document.querySelector('#reporte-formacion');
 const listaMisRedes = document.querySelector('#lista-mis-redes');
 const reporteRed = document.querySelector('#reporte-red');
 
+const botonAdmin = document.querySelector('#boton-admin');
+const seccionAdmin = document.querySelector('#seccion-admin');
+const mensajeErrorAdmin = document.querySelector('#mensaje-error-admin');
+const formularioNuevaRed = document.querySelector('#formulario-nueva-red');
+const formularioNuevoGrupo = document.querySelector('#formulario-nuevo-grupo');
+const selectGrupoRed = document.querySelector('#grupo-red');
+const listaAdminRedes = document.querySelector('#lista-admin-redes');
+const listaAdminGrupos = document.querySelector('#lista-admin-grupos');
+
 const loginSection = document.querySelector('#login-section');
 const areaApp = document.querySelector('#area-app');
 const formularioLogin = document.querySelector('#formulario-login');
@@ -86,6 +95,12 @@ function mostrarApp(usuario) {
     botonReportes.classList.remove('oculto');
   } else {
     botonReportes.classList.add('oculto');
+  }
+
+  if (usuario.rol === 'Administrador' || usuario.rol === 'Pastor') {
+    botonAdmin.classList.remove('oculto');
+  } else {
+    botonAdmin.classList.add('oculto');
   }
 
   cargarRedes();
@@ -601,6 +616,8 @@ function mostrarRedes() {
   seccionBusqueda.classList.add('oculto');
   resultados.innerHTML = '';
   seccionReportes.classList.add('oculto');
+  seccionAdmin.classList.add('oculto');
+  botonAdmin.classList.remove('activo');
   botonRedes.classList.add('activo');
   botonBuscar.classList.remove('activo');
   botonReportes.classList.remove('activo');
@@ -619,6 +636,8 @@ function mostrarBusqueda() {
   mensajeBusqueda.classList.add('oculto');
   resultados.innerHTML = '';
   seccionReportes.classList.add('oculto');
+  seccionAdmin.classList.add('oculto');
+  botonAdmin.classList.remove('activo');
   botonBuscar.classList.add('activo');
   botonRedes.classList.remove('activo');
   botonReportes.classList.remove('activo');
@@ -712,6 +731,8 @@ async function cargarReportes() {
   seccionBusqueda.classList.add('oculto');
   resultados.innerHTML = '';
   seccionReportes.classList.remove('oculto');
+  seccionAdmin.classList.add('oculto');
+  botonAdmin.classList.remove('activo');
   mensajeErrorReportes.classList.add('oculto');
   botonReportes.classList.add('activo');
   botonRedes.classList.remove('activo');
@@ -794,6 +815,150 @@ async function verReporteRed(redId) {
   reporteRed.innerHTML = html;
 }
 
+async function cargarAdmin() {
+  pantalla = 'admin';
+  tituloPagina.textContent = 'Administrar';
+  contenedorRedes.classList.add('oculto');
+  contenedorDetalle.classList.add('oculto');
+  botonVolver.classList.add('oculto');
+  botonAgregar.classList.add('oculto');
+  formularioSection.classList.add('oculto');
+  ocultarReuniones();
+  seccionBusqueda.classList.add('oculto');
+  resultados.innerHTML = '';
+  seccionReportes.classList.add('oculto');
+  seccionAdmin.classList.remove('oculto');
+  mensajeErrorAdmin.classList.add('oculto');
+  botonAdmin.classList.add('activo');
+  botonRedes.classList.remove('activo');
+  botonBuscar.classList.remove('activo');
+  botonReportes.classList.remove('activo');
+  await cargarListasAdmin();
+}
+
+async function cargarListasAdmin() {
+  const respuestaRedes = await fetch('/api/redes');
+  const redes = await respuestaRedes.json();
+
+  selectGrupoRed.innerHTML = redes.map((red) => '<option value="' + red.id + '">' + red.nombre + '</option>').join('');
+  renderAdminRedes(redes);
+
+  const respuestaGrupos = await fetch('/api/grupos?todas=1');
+  const grupos = await respuestaGrupos.json();
+  renderAdminGrupos(grupos);
+}
+
+function renderAdminRedes(redes) {
+  listaAdminRedes.innerHTML = '';
+
+  if (redes.length === 0) {
+    listaAdminRedes.innerHTML = '<p class="vacio">No hay redes creadas.</p>';
+    return;
+  }
+
+  redes.forEach((red) => {
+    const tarjeta = document.createElement('article');
+    tarjeta.className = 'tarjeta tarjeta-persona';
+    tarjeta.innerHTML = '<strong>' + red.nombre + '</strong>' +
+      '<span>' + (red.activo === 1 ? 'Activa' : 'Inactiva') + '</span>' +
+      (red.activo === 1 ? '<button class="btn btn-borde-rojo">Desactivar</button>' : '<button class="btn btn-secundario">Activar</button>');
+
+    tarjeta.querySelector('button').addEventListener('click', () => cambiarEstadoRed(red.id, red.activo === 1 ? 0 : 1));
+    listaAdminRedes.appendChild(tarjeta);
+  });
+}
+
+function renderAdminGrupos(grupos) {
+  listaAdminGrupos.innerHTML = '';
+
+  if (grupos.length === 0) {
+    listaAdminGrupos.innerHTML = '<p class="vacio">No hay grupos creados.</p>';
+    return;
+  }
+
+  grupos.forEach((grupo) => {
+    const tarjeta = document.createElement('article');
+    tarjeta.className = 'tarjeta tarjeta-persona';
+    tarjeta.innerHTML = '<strong>' + grupo.nombre + '</strong>' +
+      '<span>' + grupo.red + (grupo.activo === 1 ? ' · Activo' : ' · Inactivo') + '</span>' +
+      (grupo.activo === 1 ? '<button class="btn btn-borde-rojo">Desactivar</button>' : '<button class="btn btn-secundario">Activar</button>');
+
+    tarjeta.querySelector('button').addEventListener('click', () => cambiarEstadoGrupo(grupo.id, grupo.activo === 1 ? 0 : 1));
+    listaAdminGrupos.appendChild(tarjeta);
+  });
+}
+
+async function cambiarEstadoRed(redId, activo) {
+  await fetch('/api/redes/' + redId + '/estado', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ activo })
+  });
+  await cargarListasAdmin();
+}
+
+async function cambiarEstadoGrupo(grupoId, activo) {
+  await fetch('/api/grupos/' + grupoId + '/estado', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ activo })
+  });
+  await cargarListasAdmin();
+}
+
+async function crearRed(evento) {
+  evento.preventDefault();
+  mensajeErrorAdmin.classList.add('oculto');
+
+  const respuesta = await fetch('/api/redes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nombre: formularioNuevaRed.nombre.value })
+  });
+
+  const resultado = await respuesta.json();
+
+  if (!respuesta.ok) {
+    mensajeErrorAdmin.textContent = resultado.error;
+    mensajeErrorAdmin.classList.remove('oculto');
+    return;
+  }
+
+  formularioNuevaRed.reset();
+  await cargarListasAdmin();
+}
+
+async function crearGrupo(evento) {
+  evento.preventDefault();
+  mensajeErrorAdmin.classList.add('oculto');
+
+  const datos = {
+    red_id: selectGrupoRed.value,
+    nombre: formularioNuevoGrupo.nombre.value,
+    dia_habitual: formularioNuevoGrupo.dia_habitual.value,
+    hora_habitual: formularioNuevoGrupo.hora_habitual.value,
+    direccion: formularioNuevoGrupo.direccion.value,
+    ciudad: formularioNuevoGrupo.ciudad.value
+  };
+
+  const respuesta = await fetch('/api/grupos', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(datos)
+  });
+
+  const resultado = await respuesta.json();
+
+  if (!respuesta.ok) {
+    mensajeErrorAdmin.textContent = resultado.error;
+    mensajeErrorAdmin.classList.remove('oculto');
+    return;
+  }
+
+  formularioNuevoGrupo.reset();
+  await cargarListasAdmin();
+}
+
 formularioLogin.addEventListener('submit', async (evento) => {
   evento.preventDefault();
   mensajeErrorLogin.classList.add('oculto');
@@ -839,5 +1004,8 @@ formularioBusqueda.addEventListener('submit', buscarPersonas);
 botonBuscar.addEventListener('click', mostrarBusqueda);
 botonRedes.addEventListener('click', mostrarRedes);
 botonReportes.addEventListener('click', cargarReportes);
+botonAdmin.addEventListener('click', cargarAdmin);
+formularioNuevaRed.addEventListener('submit', crearRed);
+formularioNuevoGrupo.addEventListener('submit', crearGrupo);
 
 iniciar();

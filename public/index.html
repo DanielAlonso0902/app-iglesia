@@ -40,6 +40,7 @@
         <button id="boton-redes" class="btn-bar">Redes</button>
         <button id="boton-buscar" class="btn-bar">Buscar</button>
         <button id="boton-reportes" class="btn-bar oculto">Reportes</button>
+        <button id="boton-admin" class="btn-bar oculto">Administrar</button>
       </nav>
 
       <button id="boton-volver" class="oculto">← Volver</button>
@@ -117,6 +118,40 @@
         <h3>Redes</h3>
         <section id="lista-mis-redes"></section>
         <div id="reporte-red"></div>
+      </section>
+
+      <section id="seccion-admin" class="oculto">
+        <p id="mensaje-error-admin" class="alerta oculto"></p>
+
+        <form id="formulario-nueva-red">
+          <h4>Crear red</h4>
+          <label for="nombre-red">Nombre</label>
+          <input type="text" id="nombre-red" name="nombre" placeholder="Ej. Damas" required>
+          <div class="botones"><button type="submit" class="btn btn-primario">Crear red</button></div>
+        </form>
+
+        <form id="formulario-nuevo-grupo">
+          <h4>Crear grupo</h4>
+          <label for="grupo-red">Red</label>
+          <select id="grupo-red" name="red_id" required></select>
+          <label for="grupo-nombre">Nombre</label>
+          <input type="text" id="grupo-nombre" name="nombre" placeholder="Ej. Grupo #300" required>
+          <label for="grupo-dia">Día habitual</label>
+          <input type="text" id="grupo-dia" name="dia_habitual" placeholder="Ej. Sábado">
+          <label for="grupo-hora">Hora habitual</label>
+          <input type="text" id="grupo-hora" name="hora_habitual" placeholder="Ej. 5:30 PM">
+          <label for="grupo-direccion">Dirección</label>
+          <input type="text" id="grupo-direccion" name="direccion">
+          <label for="grupo-ciudad">Ciudad</label>
+          <input type="text" id="grupo-ciudad" name="ciudad">
+          <div class="botones"><button type="submit" class="btn btn-primario">Crear grupo</button></div>
+        </form>
+
+        <h4>Redes existentes</h4>
+        <section id="lista-admin-redes"></section>
+
+        <h4>Grupos existentes</h4>
+        <section id="lista-admin-grupos"></section>
       </section>
     </div>
   </main>
