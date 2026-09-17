@@ -57,3 +57,14 @@ CREATE TABLE IF NOT EXISTS persona_grupo (
   FOREIGN KEY (persona_id) REFERENCES personas(id),
   FOREIGN KEY (grupo_id) REFERENCES grupos(id)
 );
+
+CREATE TABLE IF NOT EXISTS usuarios (
+  id INTEGER PRIMARY KEY,
+  cedula TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  rol TEXT NOT NULL CHECK (rol IN ('Administrador', 'Pastor', 'Líder de Red', 'Líder de Grupo')),
+  persona_id INTEGER,
+  activo INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (persona_id) REFERENCES personas(id)
+);
