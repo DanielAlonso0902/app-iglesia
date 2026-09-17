@@ -28,6 +28,20 @@ app.get('/api/grupos', (req, res) => {
   res.json(grupos);
 });
 
+app.get('/api/redes/:id/grupos', (req, res) => {
+  const redId = Number(req.params.id);
+
+  const grupos = db.prepare(`
+    SELECT grupos.*, redes.nombre AS red
+    FROM grupos
+    JOIN redes ON redes.id = grupos.red_id
+    WHERE grupos.red_id = ?
+    ORDER BY grupos.nombre
+  `).all(redId);
+
+  res.json(grupos);
+});
+
 app.get('/api/personas', (req, res) => {
   const personas = db.prepare('SELECT * FROM personas ORDER BY nombre_completo').all();
   res.json(personas);
