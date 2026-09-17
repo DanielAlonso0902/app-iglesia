@@ -4,9 +4,7 @@ const db = require('./db');
 const app = express();
 const PORT = 3000;
 
-app.get('/', (req, res) => {
-  res.send('Bienvenido a la administración de grupos pequeños');
-});
+app.use(express.static('public'));
 
 app.get('/api/estado', (req, res) => {
   res.json({
