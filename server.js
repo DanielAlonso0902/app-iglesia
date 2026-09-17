@@ -427,10 +427,16 @@ app.get('/api/usuarios', requiereSesion, requiereRol(['Administrador', 'Pastor']
 });
 
 app.post('/api/usuarios', requiereSesion, requiereRol(['Administrador', 'Pastor']), (req, res) => {
-  const personaId = Number(req.body.persona_id);
+  let personaId = Number(req.body.persona_id);
+  const nombrePersona = (req.body.nombre_persona || '').trim();
   const rol = req.body.rol;
   const cedula = req.body.cedula || '';
   const contrasena = req.body.contrasena;
+
+  if (!personaId && nombrePersona) {
+    const resultado = db.prepare('INSERT INTO personas (nombre_completo) VALUES (?)').run(nombrePersona);
+    personaId = Number(resultado.lastInsertRowid);
+  }
 
   if (!personaId || !rol || !cedula || !contrasena) {
     res.status(400).json({ error: 'La persona, el rol, la cédula y la contraseña son obligatorios.' });

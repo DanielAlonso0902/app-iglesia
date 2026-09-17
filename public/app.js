@@ -54,6 +54,7 @@ const listaAdminGrupos = document.querySelector('#lista-admin-grupos');
 
 const formularioUsuario = document.querySelector('#formulario-usuario');
 const selectUsuarioPersona = document.querySelector('#usuario-persona');
+const campoPersonaNueva = document.querySelector('#campo-persona-nueva');
 const selectUsuarioRol = document.querySelector('#usuario-rol');
 const campoRedUsuario = document.querySelector('#campo-red-usuario');
 const selectUsuarioRed = document.querySelector('#usuario-red');
@@ -111,6 +112,12 @@ function mostrarLogin() {
   areaApp.classList.add('oculto');
   usuarioBarra.classList.add('oculto');
   barraNavegacion.classList.add('oculto');
+}
+
+function cerrarSesionFrontend() {
+  usuarioActual = null;
+  pantalla = null;
+  mostrarLogin();
 }
 
 function mostrarApp(usuario) {
@@ -1220,9 +1227,12 @@ async function cargarListasAdmin() {
 
   const respuestaPersonas = await fetch('/api/personas');
   const personas = await respuestaPersonas.json();
-  selectUsuarioPersona.innerHTML = personas
-    .map((persona) => '<option value="' + persona.id + '">' + persona.nombre_completo + '</option>')
-    .join('');
+  selectUsuarioPersona.innerHTML =
+    '<option value="">— Crear persona nueva —</option>' +
+    personas
+      .map((persona) => '<option value="' + persona.id + '">' + persona.nombre_completo + '</option>')
+      .join('');
+  actualizarCamposUsuario();
 
   const respuestaUsuarios = await fetch('/api/usuarios');
   const usuarios = await respuestaUsuarios.json();
@@ -1366,6 +1376,7 @@ function actualizarCamposUsuario() {
   const rol = selectUsuarioRol.value;
   campoRedUsuario.classList.toggle('oculto', rol !== 'Líder de Red');
   campoGrupoUsuario.classList.toggle('oculto', rol !== 'Líder de Grupo');
+  campoPersonaNueva.classList.toggle('oculto', selectUsuarioPersona.value !== '');
 }
 
 async function crearUsuario(evento) {
@@ -1374,6 +1385,7 @@ async function crearUsuario(evento) {
 
   const datos = {
     persona_id: selectUsuarioPersona.value,
+    nombre_persona: formularioUsuario.nombre_persona.value,
     rol: selectUsuarioRol.value,
     red_id: selectUsuarioRed.value,
     grupo_id: selectUsuarioGrupo.value,
@@ -1517,6 +1529,7 @@ formularioNuevaRed.addEventListener('submit', crearRed);
 formularioNuevoGrupo.addEventListener('submit', crearGrupo);
 formularioUsuario.addEventListener('submit', crearUsuario);
 selectUsuarioRol.addEventListener('change', actualizarCamposUsuario);
+selectUsuarioPersona.addEventListener('change', actualizarCamposUsuario);
 formularioCambioLiderRed.addEventListener('submit', transferirLiderRed);
 
 const horas = [];
