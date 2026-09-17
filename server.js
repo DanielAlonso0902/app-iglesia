@@ -42,6 +42,28 @@ app.get('/api/redes/:id/grupos', (req, res) => {
   res.json(grupos);
 });
 
+app.get('/api/grupos/:id/integrantes', (req, res) => {
+  const grupoId = Number(req.params.id);
+
+  const integrantes = db.prepare(`
+    SELECT personas.id, personas.nombre_completo, personas.celular, persona_grupo.rol
+    FROM persona_grupo
+    JOIN personas ON personas.id = persona_grupo.persona_id
+    WHERE persona_grupo.grupo_id = ?
+      AND persona_grupo.activo = 1
+    ORDER BY
+      CASE persona_grupo.rol
+        WHEN 'Líder' THEN 1
+        WHEN 'Apoyo' THEN 2
+        WHEN 'Anfitrión' THEN 3
+        WHEN 'Integrante' THEN 4
+      END,
+      personas.nombre_completo
+  `).all(grupoId);
+
+  res.json(integrantes);
+});
+
 app.get('/api/personas', (req, res) => {
   const personas = db.prepare('SELECT * FROM personas ORDER BY nombre_completo').all();
   res.json(personas);

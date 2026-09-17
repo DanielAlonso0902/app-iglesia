@@ -104,7 +104,7 @@ footer {
   flex-direction: column;
   gap: 0.35rem;
   font-weight: 400;
-  cursor: default;
+  cursor: pointer;
 }
 
 .tarjeta-grupo:hover {
@@ -126,6 +126,73 @@ footer {
   text-align: center;
   color: #6b7a8a;
   padding: 1.5rem;
+}
+
+.integrante {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background-color: var(--blanco);
+  border-radius: 0.75rem;
+  padding: 0.8rem 1rem;
+  box-shadow: 0 2px 6px rgba(34, 48, 62, 0.1);
+  margin-bottom: 0.75rem;
+}
+
+.avatar {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+  background: var(--azul-rey);
+  color: var(--blanco);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.1rem;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.info strong {
+  font-size: 0.95rem;
+}
+
+.rol {
+  font-size: 0.7rem;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 0.3rem 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.rol-lider {
+  background: var(--azul-oscuro);
+  color: var(--blanco);
+}
+
+.rol-apoyo {
+  background: #2e8b57;
+  color: var(--blanco);
+}
+
+.rol-anfitrion {
+  background: #e8a406;
+  color: var(--blanco);
+}
+
+.rol-integrante {
+  background: #e3e8f2;
+  color: var(--texto);
 }
 
 @media (min-width: 600px) {
