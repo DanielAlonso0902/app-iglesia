@@ -20,11 +20,18 @@ const listaReuniones = document.querySelector('#lista-reuniones');
 const barraNavegacion = document.querySelector('#barra-navegacion');
 const botonRedes = document.querySelector('#boton-redes');
 const botonBuscar = document.querySelector('#boton-buscar');
+const botonReportes = document.querySelector('#boton-reportes');
 const seccionBusqueda = document.querySelector('#seccion-busqueda');
 const formularioBusqueda = document.querySelector('#formulario-busqueda');
 const campoBusqueda = document.querySelector('#campo-busqueda');
 const mensajeBusqueda = document.querySelector('#mensaje-busqueda');
 const resultados = document.querySelector('#resultados');
+
+const seccionReportes = document.querySelector('#seccion-reportes');
+const mensajeErrorReportes = document.querySelector('#mensaje-error-reportes');
+const reporteFormacion = document.querySelector('#reporte-formacion');
+const listaMisRedes = document.querySelector('#lista-mis-redes');
+const reporteRed = document.querySelector('#reporte-red');
 
 const loginSection = document.querySelector('#login-section');
 const areaApp = document.querySelector('#area-app');
@@ -74,6 +81,13 @@ function mostrarApp(usuario) {
   usuarioBarra.classList.remove('oculto');
   barraNavegacion.classList.remove('oculto');
   textoUsuario.textContent = 'Cédula ' + usuario.cedula + ' · ' + usuario.rol;
+
+  if (usuario.rol === 'Administrador' || usuario.rol === 'Pastor' || usuario.rol === 'Líder de Red') {
+    botonReportes.classList.remove('oculto');
+  } else {
+    botonReportes.classList.add('oculto');
+  }
+
   cargarRedes();
 }
 
@@ -586,8 +600,10 @@ function mostrarRedes() {
   ocultarReuniones();
   seccionBusqueda.classList.add('oculto');
   resultados.innerHTML = '';
+  seccionReportes.classList.add('oculto');
   botonRedes.classList.add('activo');
   botonBuscar.classList.remove('activo');
+  botonReportes.classList.remove('activo');
 }
 
 function mostrarBusqueda() {
@@ -602,8 +618,10 @@ function mostrarBusqueda() {
   seccionBusqueda.classList.remove('oculto');
   mensajeBusqueda.classList.add('oculto');
   resultados.innerHTML = '';
+  seccionReportes.classList.add('oculto');
   botonBuscar.classList.add('activo');
   botonRedes.classList.remove('activo');
+  botonReportes.classList.remove('activo');
   campoBusqueda.focus();
 }
 
@@ -650,6 +668,132 @@ function renderizarResultados(personas) {
   });
 }
 
+function claseParaGrafico(etapa) {
+  if (etapa === 'Sin formación') return 'gris';
+  return clasePorEtapa(etapa);
+}
+
+function fichaDeTotales(numeros) {
+  let html = '<section class="reporte-totales">';
+  html += '<div class="total total-personas"><strong>' + numeros.personas + '</strong><span>personas</span></div>';
+  if (numeros.nuevos !== undefined) {
+    html += '<div class="total total-nuevos"><strong>' + numeros.nuevos + '</strong><span>nuevas</span></div>';
+    html += '<div class="total total-bautizados"><strong>' + numeros.bautizados + '</strong><span>bautizadas</span></div>';
+  }
+  html += '</section>';
+  return html;
+}
+
+function barrasDeEtapas(porEtapa, totalPersonas) {
+  let html = '<section class="grafico-etapas">';
+
+  porEtapa.forEach((fila) => {
+    const pct = totalPersonas === 0 ? 0 : Math.round((fila.cantidad / totalPersonas) * 100);
+    html +=
+      '<div class="fila-grafico">' +
+      '<span class="etiqueta">' + fila.etapa + ' (' + fila.cantidad + ')</span>' +
+      '<div class="barra"><div class="relleno relleno-' + claseParaGrafico(fila.etapa) + '" style="width:' + pct + '%"></div></div>' +
+      '</div>';
+  });
+
+  html += '</section>';
+  return html;
+}
+
+async function cargarReportes() {
+  pantalla = 'reportes';
+  tituloPagina.textContent = 'Reportes';
+  contenedorRedes.classList.add('oculto');
+  contenedorDetalle.classList.add('oculto');
+  botonVolver.classList.add('oculto');
+  botonAgregar.classList.add('oculto');
+  formularioSection.classList.add('oculto');
+  ocultarReuniones();
+  seccionBusqueda.classList.add('oculto');
+  resultados.innerHTML = '';
+  seccionReportes.classList.remove('oculto');
+  mensajeErrorReportes.classList.add('oculto');
+  botonReportes.classList.add('activo');
+  botonRedes.classList.remove('activo');
+  botonBuscar.classList.remove('activo');
+  reporteRed.innerHTML = '';
+  listaMisRedes.innerHTML = '';
+
+  if (usuarioActual.rol === 'Administrador' || usuarioActual.rol === 'Pastor') {
+    const respuesta = await fetch('/api/reportes/formacion');
+    const reporte = await respuesta.json();
+    reporteFormacion.innerHTML =
+      '<h3>Formación general</h3>' +
+      fichaDeTotales(reporte.resumen) +
+      barrasDeEtapas(reporte.porEtapa, reporte.resumen.personas);
+  } else {
+    reporteFormacion.innerHTML = '<h3>Formación de mi red</h3>';
+  }
+
+  const respuestaRedes = await fetch('/api/mis-redes');
+  const redes = await respuestaRedes.json();
+
+  if (redes.length === 0) {
+    listaMisRedes.innerHTML = '<p class="vacio">No tienes redes asignadas.</p>';
+    return;
+  }
+
+  redes.forEach((red) => {
+    const tarjeta = document.createElement('article');
+    tarjeta.className = 'tarjeta tarjeta-persona';
+    tarjeta.innerHTML = '<strong>' + red.nombre + '</strong>';
+
+    const boton = document.createElement('button');
+    boton.className = 'btn btn-secundario';
+    boton.textContent = 'Ver reporte';
+    boton.addEventListener('click', () => verReporteRed(red.id));
+
+    tarjeta.appendChild(boton);
+    listaMisRedes.appendChild(tarjeta);
+  });
+}
+
+async function verReporteRed(redId) {
+  mensajeErrorReportes.classList.add('oculto');
+  const respuesta = await fetch('/api/reportes/red/' + redId);
+  const reporte = await respuesta.json();
+
+  if (!respuesta.ok) {
+    mensajeErrorReportes.textContent = reporte.error;
+    mensajeErrorReportes.classList.remove('oculto');
+    return;
+  }
+
+  const porEtapa = reporte.formacion;
+  const cuentanEtapa = porEtapa.reduce((suma, fila) => suma + fila.cantidad, 0);
+
+  let html = '<h3>Reporte de ' + reporte.red + '</h3>';
+
+  html += '<section class="reporte-totales">';
+  html += '<div class="total total-personas"><strong>' + reporte.totalGrupos + '</strong><span>grupos</span></div>';
+  html += '<div class="total total-personas"><strong>' + reporte.totalIntegrantes + '</strong><span>integrantes</span></div>';
+  html += '<div class="total total-personas"><strong>' + reporte.totalReuniones + '</strong><span>reuniones</span></div>';
+  html += '<div class="total total-nuevos"><strong>' + reporte.nuevos + '</strong><span>nuevos</span></div>';
+  html += '<div class="total total-bautizados"><strong>' + reporte.bautizados + '</strong><span>bautizados</span></div>';
+  html += '</section>';
+
+  html += '<h3>Grupos</h3><section id="detalle">';
+
+  reporte.porGrupo.forEach((grupo) => {
+    html +=
+      '<article class="tarjeta tarjeta-persona">' +
+      '<strong>' + grupo.nombre + '</strong>' +
+      '<span>' + grupo.integrantes + ' integrantes · ' + grupo.reuniones + ' reuniones</span>' +
+      '</article>';
+  });
+
+  html += '</section>';
+  html += '<h3>Etapas de formación</h3>';
+  html += barrasDeEtapas(porEtapa, cuentanEtapa === 0 ? reporte.totalIntegrantes : cuentanEtapa);
+
+  reporteRed.innerHTML = html;
+}
+
 formularioLogin.addEventListener('submit', async (evento) => {
   evento.preventDefault();
   mensajeErrorLogin.classList.add('oculto');
@@ -694,5 +838,6 @@ formularioReunion.addEventListener('submit', crearReunion);
 formularioBusqueda.addEventListener('submit', buscarPersonas);
 botonBuscar.addEventListener('click', mostrarBusqueda);
 botonRedes.addEventListener('click', mostrarRedes);
+botonReportes.addEventListener('click', cargarReportes);
 
 iniciar();

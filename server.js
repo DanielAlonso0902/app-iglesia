@@ -96,6 +96,23 @@ function puedeVerPersona(personaId, usuario) {
 
 const etapasFormacion = ['Discípulo S1', 'Discípulo S2', 'Discípulo S3', 'Discípulo S4', 'Bendición N1', 'Bendición N2', 'Bendición N3', 'Ministerio de la Misericordia'];
 
+function puedeVerRed(redId, usuario) {
+  if (usuario.rol === 'Administrador' || usuario.rol === 'Pastor') {
+    return true;
+  }
+
+  if (usuario.rol === 'Líder de Red') {
+    if (!usuario.persona_id) return false;
+
+    return !!db.prepare(`
+      SELECT id FROM persona_red
+      WHERE persona_id = ? AND red_id = ? AND activo = 1
+    `).get(usuario.persona_id, redId);
+  }
+
+  return false;
+}
+
 app.get('/api/personas/:id', requiereSesion, (req, res) => {
   const personaId = Number(req.params.id);
   const persona = db.prepare('SELECT * FROM personas WHERE id = ?').get(personaId);
@@ -169,6 +186,110 @@ app.post('/api/personas/:id/formacion/avanzar', requiereSesion, requiereRol(['Ad
   } catch (e) {
     res.status(409).json({ error: 'La persona ya registró esa etapa.' });
   }
+});
+
+app.get('/api/mis-redes', requiereSesion, (req, res) => {
+  let redes;
+
+  if (req.usuario.rol === 'Administrador' || req.usuario.rol === 'Pastor') {
+    redes = db.prepare('SELECT * FROM redes ORDER BY nombre').all();
+  } else {
+    redes = db.prepare(`
+      SELECT redes.*
+      FROM redes
+      JOIN persona_red pr ON pr.red_id = redes.id
+      WHERE pr.persona_id = ? AND pr.activo = 1
+      ORDER BY redes.nombre
+    `).all(req.usuario.persona_id);
+  }
+
+  res.json(redes);
+});
+
+app.get('/api/reportes/red/:id', requiereSesion, (req, res) => {
+  const redId = Number(req.params.id);
+  const red = db.prepare('SELECT * FROM redes WHERE id = ?').get(redId);
+
+  if (!red) {
+    res.status(404).json({ error: 'Red no encontrada.' });
+    return;
+  }
+
+  if (!puedeVerRed(redId, req.usuario)) {
+    res.status(403).json({ error: 'No puedes consultar esta red.' });
+    return;
+  }
+
+  const grupos = db.prepare('SELECT id, nombre FROM grupos WHERE red_id = ? ORDER BY nombre').all(redId);
+
+  const porGrupo = grupos.map((grupo) => ({
+    id: grupo.id,
+    nombre: grupo.nombre,
+    integrantes: db.prepare('SELECT COUNT(*) AS n FROM persona_grupo WHERE grupo_id = ? AND activo = 1').get(grupo.id).n,
+    reuniones: db.prepare('SELECT COUNT(*) AS n FROM reuniones WHERE grupo_id = ?').get(grupo.id).n
+  }));
+
+  const totalIntegrantes = porGrupo.reduce((suma, grupo) => suma + grupo.integrantes, 0);
+  const totalReuniones = porGrupo.reduce((suma, grupo) => suma + grupo.reuniones, 0);
+
+  const integrantesDeLaRed = db.prepare(`
+    SELECT DISTINCT pg.persona_id
+    FROM persona_grupo pg
+    JOIN grupos g ON g.id = pg.grupo_id
+    WHERE g.red_id = ? AND pg.activo = 1
+  `).all(redId);
+
+  const fichaPersona = db.prepare('SELECT es_nuevo, bautizado FROM personas WHERE id = ?');
+  const etapaActiva = db.prepare('SELECT etapa FROM proceso_formacion WHERE persona_id = ? AND activo = 1');
+
+  const contadorEtapas = {};
+  let nuevos = 0;
+  let bautizados = 0;
+
+  for (const fila of integrantesDeLaRed) {
+    const ficha = fichaPersona.get(fila.persona_id);
+    if (ficha.es_nuevo === 1) nuevos++;
+    if (ficha.bautizado === 1) bautizados++;
+
+    const etapa = etapaActiva.get(fila.persona_id);
+    const clave = etapa ? etapa.etapa : 'Sin formación';
+    contadorEtapas[clave] = (contadorEtapas[clave] || 0) + 1;
+  }
+
+  const formacion = Object.entries(contadorEtapas)
+    .map(([etapa, cantidad]) => ({ etapa, cantidad }))
+    .sort((a, b) => b.cantidad - a.cantidad);
+
+  res.json({
+    red: red.nombre,
+    totalGrupos: porGrupo.length,
+    totalIntegrantes,
+    totalReuniones,
+    porGrupo,
+    formacion,
+    nuevos,
+    bautizados
+  });
+});
+
+app.get('/api/reportes/formacion', requiereSesion, requiereRol(['Administrador', 'Pastor']), (req, res) => {
+  const porEtapa = db.prepare(`
+    SELECT COALESCE(pf.etapa, 'Sin formación') AS etapa, COUNT(*) AS cantidad
+    FROM personas p
+    LEFT JOIN proceso_formacion pf ON pf.persona_id = p.id AND pf.activo = 1
+    GROUP BY pf.etapa
+    ORDER BY cantidad DESC
+  `).all();
+
+  const resumen = db.prepare(`
+    SELECT
+      COUNT(*) AS personas,
+      SUM(CASE WHEN es_nuevo = 1 THEN 1 ELSE 0 END) AS nuevos,
+      SUM(CASE WHEN bautizado = 1 THEN 1 ELSE 0 END) AS bautizados
+    FROM personas
+  `).get();
+
+  res.json({ porEtapa, resumen });
 });
 
 app.post('/api/login', (req, res) => {

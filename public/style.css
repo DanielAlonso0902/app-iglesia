@@ -545,6 +545,92 @@ footer {
   border-color: var(--azul-rey);
 }
 
+.reporte-totales {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem;
+  margin: 1rem 0;
+}
+
+.total {
+  background-color: var(--blanco);
+  border-radius: 0.75rem;
+  padding: 1rem 0.5rem;
+  text-align: center;
+  box-shadow: 0 2px 6px rgba(34, 48, 62, 0.1);
+  border-top: 0.3rem solid var(--azul-rey);
+}
+
+.total strong {
+  display: block;
+  font-size: 1.4rem;
+  color: var(--azul-oscuro);
+}
+
+.total span {
+  font-size: 0.75rem;
+  color: #6b7a8a;
+}
+
+.total-nuevos {
+  border-top-color: #e8a406;
+}
+
+.total-bautizados {
+  border-top-color: #2e8b57;
+}
+
+.grafico-etapas {
+  background-color: var(--blanco);
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+  box-shadow: 0 2px 6px rgba(34, 48, 62, 0.1);
+}
+
+.fila-grafico {
+  margin-bottom: 0.9rem;
+}
+
+.fila-grafico:last-child {
+  margin-bottom: 0;
+}
+
+.etiqueta {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 0.3rem;
+  color: var(--texto);
+}
+
+.barra {
+  background-color: #e3e8f2;
+  border-radius: 999px;
+  height: 0.85rem;
+  overflow: hidden;
+}
+
+.relleno {
+  height: 100%;
+  border-radius: 999px;
+}
+
+.relleno-discipulo {
+  background-color: #6a5acd;
+}
+
+.relleno-bendicion {
+  background-color: #2e8b57;
+}
+
+.relleno-misericordia {
+  background-color: #b8860b;
+}
+
+.relleno-gris {
+  background-color: #9aa7b5;
+}
+
 @media (min-width: 600px) {
   #lista-redes {
     grid-template-columns: repeat(2, 1fr);
