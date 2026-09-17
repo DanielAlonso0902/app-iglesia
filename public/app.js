@@ -292,7 +292,9 @@ async function crearIntegrante(evento) {
 
   const datos = {
     nombre: formulario.nombre.value,
+    cedula: formulario.cedula.value,
     celular: formulario.celular.value,
+    direccion: formulario.direccion.value,
     rol: formulario.rol.value
   };
 

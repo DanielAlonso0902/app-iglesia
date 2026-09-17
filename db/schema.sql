@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS grupos (
 CREATE TABLE IF NOT EXISTS personas (
   id INTEGER PRIMARY KEY,
   nombre_completo TEXT NOT NULL,
+  cedula TEXT,
   fecha_nacimiento TEXT,
   sexo TEXT,
   celular TEXT,

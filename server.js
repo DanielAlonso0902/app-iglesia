@@ -759,7 +759,7 @@ app.get('/api/grupos/:id/integrantes', requiereSesion, (req, res) => {
   }
 
   const integrantes = db.prepare(`
-    SELECT personas.id, personas.nombre_completo, personas.celular, persona_grupo.rol
+    SELECT personas.id, personas.nombre_completo, personas.cedula, personas.celular, personas.direccion, persona_grupo.rol
     FROM persona_grupo
     JOIN personas ON personas.id = persona_grupo.persona_id
     WHERE persona_grupo.grupo_id = ?
@@ -1038,7 +1038,9 @@ app.post('/api/grupos/:id/integrantes', requiereSesion, requiereRol(['Administra
   }
 
   const nombre = req.body.nombre;
+  const cedula = req.body.cedula || null;
   const celular = req.body.celular || null;
+  const direccion = req.body.direccion || null;
   const rol = req.body.rol;
 
   if (!nombre || !rol) {
@@ -1052,14 +1054,14 @@ app.post('/api/grupos/:id/integrantes', requiereSesion, requiereRol(['Administra
   }
 
   const insertarPersona = db.prepare(
-    'INSERT INTO personas (nombre_completo, celular) VALUES (?, ?)'
+    'INSERT INTO personas (nombre_completo, cedula, celular, direccion) VALUES (?, ?, ?, ?)'
   );
   const insertarPertenencia = db.prepare(
     'INSERT INTO persona_grupo (persona_id, grupo_id, rol, fecha_inicio, activo) VALUES (?, ?, ?, ?, 1)'
   );
 
   const crearIntegrante = db.transaction(() => {
-    const resultado = insertarPersona.run(nombre, celular);
+    const resultado = insertarPersona.run(nombre, cedula, celular, direccion);
     const personaId = Number(resultado.lastInsertRowid);
     const hoy = new Date().toISOString().slice(0, 10);
     insertarPertenencia.run(personaId, grupoId, rol, hoy);
@@ -1068,7 +1070,7 @@ app.post('/api/grupos/:id/integrantes', requiereSesion, requiereRol(['Administra
 
   const personaId = crearIntegrante();
 
-  res.status(201).json({ id: personaId, nombre, celular, rol });
+  res.status(201).json({ id: personaId, nombre, cedula, celular, direccion, rol });
 });
 
 app.listen(PORT, () => {
