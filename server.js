@@ -81,7 +81,42 @@ function puedeVerGrupo(grupoId, usuario) {
     return !!pertenencia;
   }
 
+  if (usuario.rol === 'Miembro') {
+    if (!usuario.persona_id) return false;
+
+    const pertenencia = db.prepare(`
+      SELECT id FROM persona_grupo
+      WHERE persona_id = ? AND grupo_id = ? AND activo = 1
+    `).get(usuario.persona_id, grupoId);
+
+    return !!pertenencia;
+  }
+
   return false;
+}
+
+function rolAutomatico(personaId) {
+  const comoLiderRed = db.prepare('SELECT id FROM persona_red WHERE persona_id = ? AND activo = 1').get(personaId);
+  if (comoLiderRed) return 'Líder de Red';
+
+  const comoLiderGrupo = db.prepare("SELECT id FROM persona_grupo WHERE persona_id = ? AND rol = 'Líder' AND activo = 1").get(personaId);
+  if (comoLiderGrupo) return 'Líder de Grupo';
+
+  return 'Miembro';
+}
+
+function actualizarRolDe(personaId) {
+  if (!personaId) return;
+
+  const usuario = db.prepare('SELECT id, rol FROM usuarios WHERE persona_id = ?').get(personaId);
+  if (!usuario) return;
+
+  if (!['Líder de Red', 'Líder de Grupo', 'Miembro'].includes(usuario.rol)) return;
+
+  const nuevoRol = rolAutomatico(personaId);
+  if (nuevoRol !== usuario.rol) {
+    db.prepare('UPDATE usuarios SET rol = ? WHERE id = ?').run(nuevoRol, usuario.id);
+  }
 }
 
 function puedeVerPersona(personaId, usuario) {
@@ -437,6 +472,8 @@ app.post('/api/usuarios', requiereSesion, requiereRol(['Administrador', 'Pastor'
   const resultado = db.prepare('INSERT INTO usuarios (cedula, password_hash, rol, persona_id) VALUES (?, ?, ?, ?)')
     .run(cedula, bcrypt.hashSync(contrasena, 10), rol, personaId);
 
+  actualizarRolDe(personaId);
+
   res.status(201).json({ id: Number(resultado.lastInsertRowid), cedula, rol });
 });
 
@@ -495,6 +532,8 @@ app.post('/api/grupos/:id/integrantes/:personaId/retirar', requiereSesion, requi
   db.prepare('UPDATE persona_grupo SET fecha_fin = ?, activo = 0 WHERE grupo_id = ? AND persona_id = ? AND activo = 1')
     .run(new Date().toISOString().slice(0, 10), grupoId, personaId);
 
+  actualizarRolDe(personaId);
+
   res.json({ mensaje: 'Integrante retirado del grupo.' });
 });
 
@@ -531,6 +570,8 @@ app.post('/api/grupos/:id/transferir-lider', requiereSesion, requiereRol(['Admin
 
   const hoy = new Date().toISOString().slice(0, 10);
 
+  const antiguosLideres = db.prepare("SELECT DISTINCT persona_id FROM persona_grupo WHERE grupo_id = ? AND rol = 'Líder' AND activo = 1").all(grupoId).map((fila) => fila.persona_id);
+
   const cerrar = db.transaction(() => {
     db.prepare("UPDATE persona_grupo SET fecha_fin = ?, activo = 0 WHERE grupo_id = ? AND rol = 'Líder' AND activo = 1").run(hoy, grupoId);
 
@@ -548,6 +589,9 @@ app.post('/api/grupos/:id/transferir-lider', requiereSesion, requiereRol(['Admin
     res.status(400).json({ error: error.message });
     return;
   }
+
+  actualizarRolDe(personaId);
+  antiguosLideres.forEach(actualizarRolDe);
 
   res.json({ mensaje: 'Liderazgo transferido.' });
 });
@@ -573,12 +617,17 @@ app.post('/api/redes/:id/transferir-lider', requiereSesion, requiereRol(['Admini
 
   const hoy = new Date().toISOString().slice(0, 10);
 
+  const antiguosLideres = db.prepare('SELECT DISTINCT persona_id FROM persona_red WHERE red_id = ? AND activo = 1').all(redId).map((fila) => fila.persona_id);
+
   const cerrar = db.transaction(() => {
     db.prepare('UPDATE persona_red SET fecha_fin = ?, activo = 0 WHERE red_id = ? AND activo = 1').run(hoy, redId);
     db.prepare('INSERT INTO persona_red (persona_id, red_id, fecha_inicio, activo) VALUES (?, ?, ?, 1)').run(personaId, redId, hoy);
   });
 
   cerrar();
+
+  actualizarRolDe(personaId);
+  antiguosLideres.forEach(actualizarRolDe);
 
   res.json({ mensaje: 'Liderazgo de la red transferido.' });
 });
@@ -599,11 +648,14 @@ app.post('/api/login', (req, res) => {
     return;
   }
 
+  actualizarRolDe(usuario.persona_id);
+
   const token = crypto.randomBytes(32).toString('hex');
   db.prepare('INSERT INTO sesiones (token, usuario_id) VALUES (?, ?)').run(token, usuario.id);
 
+  const rolActual = db.prepare('SELECT rol FROM usuarios WHERE id = ?').get(usuario.id).rol;
   res.cookie('sesion', token, { httpOnly: true, sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000 });
-  res.json({ id: usuario.id, cedula: usuario.cedula, rol: usuario.rol });
+  res.json({ id: usuario.id, cedula: usuario.cedula, rol: rolActual });
 });
 
 app.get('/api/me', requiereSesion, (req, res) => {
