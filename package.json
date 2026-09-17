@@ -1,0 +1,16 @@
+{
+  "name": "app-iglesia",
+  "version": "1.0.0",
+  "description": "Aplicacion web para administrar las redes y grupos pequenos de una iglesia",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "express": "^5.2.1"
+  }
+}
