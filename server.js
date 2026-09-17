@@ -848,6 +848,69 @@ app.post('/api/grupos/:id/reuniones', requiereSesion, requiereRol(['Administrado
   res.status(201).json({ id: Number(resultado.lastInsertRowid), fecha, tipo, realizada, duracion, observacion });
 });
 
+app.patch('/api/reuniones/:id', requiereSesion, requiereRol(['Administrador', 'Pastor', 'Líder de Red', 'Líder de Grupo']), (req, res) => {
+  const reunionId = Number(req.params.id);
+  const reunion = db.prepare('SELECT * FROM reuniones WHERE id = ?').get(reunionId);
+
+  if (!reunion) {
+    res.status(404).json({ error: 'Reunión no encontrada.' });
+    return;
+  }
+
+  if (req.usuario.rol !== 'Administrador' && !puedeVerGrupo(reunion.grupo_id, req.usuario)) {
+    res.status(403).json({ error: 'Solo puedes editar reuniones de tus propios grupos.' });
+    return;
+  }
+
+  const fecha = req.body.fecha === undefined ? reunion.fecha : req.body.fecha;
+  const tipo = req.body.tipo === undefined ? reunion.tipo : req.body.tipo;
+  const duracion = req.body.duracion === undefined ? reunion.duracion : (req.body.duracion || null);
+  const observacion = req.body.observacion === undefined ? reunion.observacion : (req.body.observacion || null);
+  const realizada = req.body.realizada === undefined ? reunion.realizada : (req.body.realizada ? 1 : 0);
+
+  if (!fecha) {
+    res.status(400).json({ error: 'La fecha es obligatoria.' });
+    return;
+  }
+
+  const tiposValidos = ['Grupo habitual', 'Servicio de red', 'Actividad especial', 'Reunión cancelada'];
+  if (!tiposValidos.includes(tipo)) {
+    res.status(400).json({ error: 'El tipo de reunión no es válido.' });
+    return;
+  }
+
+  db.prepare(`
+    UPDATE reuniones
+    SET fecha = ?, tipo = ?, realizada = ?, duracion = ?, observacion = ?
+    WHERE id = ?
+  `).run(fecha, tipo, realizada, duracion, observacion, reunionId);
+
+  res.json({ mensaje: 'Reunión actualizada.' });
+});
+
+app.post('/api/reuniones/:id/anular', requiereSesion, requiereRol(['Administrador', 'Pastor', 'Líder de Red', 'Líder de Grupo']), (req, res) => {
+  const reunionId = Number(req.params.id);
+  const reunion = db.prepare('SELECT * FROM reuniones WHERE id = ?').get(reunionId);
+
+  if (!reunion) {
+    res.status(404).json({ error: 'Reunión no encontrada.' });
+    return;
+  }
+
+  if (req.usuario.rol !== 'Administrador' && !puedeVerGrupo(reunion.grupo_id, req.usuario)) {
+    res.status(403).json({ error: 'Solo puedes anular reuniones de tus propios grupos.' });
+    return;
+  }
+
+  db.prepare('UPDATE reuniones SET realizada = 0, tipo = ?, observacion = ? WHERE id = ?').run(
+    'Reunión cancelada',
+    [reunion.observacion, req.body.motivo].filter(Boolean).join(' · '),
+    reunionId
+  );
+
+  res.json({ mensaje: 'Reunión anulada.' });
+});
+
 app.get('/api/reuniones/:id', requiereSesion, (req, res) => {
   const reunionId = Number(req.params.id);
   const reunion = db.prepare('SELECT * FROM reuniones WHERE id = ?').get(reunionId);

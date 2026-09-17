@@ -17,6 +17,11 @@ const mensajeErrorReunion = document.querySelector('#mensaje-error-reunion');
 const tituloReuniones = document.querySelector('#titulo-reuniones');
 const listaReuniones = document.querySelector('#lista-reuniones');
 
+const formularioEditarReunionSection = document.querySelector('#formulario-editar-reunion-section');
+const formularioEditarReunion = document.querySelector('#formulario-editar-reunion');
+const cancelarEditarReunion = document.querySelector('#cancelar-editar-reunion');
+const mensajeErrorEditarReunion = document.querySelector('#mensaje-error-editar-reunion');
+
 const barraNavegacion = document.querySelector('#barra-navegacion');
 const botonRedes = document.querySelector('#boton-redes');
 const botonBuscar = document.querySelector('#boton-buscar');
@@ -450,6 +455,24 @@ function renderizarReuniones(reuniones, puedeGestionar) {
         verDetalleReunion();
       });
       tarjeta.appendChild(botonAsistencia);
+
+      const botonEditar = document.createElement('button');
+      botonEditar.className = 'btn btn-secundario';
+      botonEditar.textContent = 'Editar';
+      botonEditar.addEventListener('click', () => {
+        abrirFormularioEditarReunion(reunion);
+      });
+      tarjeta.appendChild(botonEditar);
+
+      if (reunion.realizada) {
+        const botonAnular = document.createElement('button');
+        botonAnular.className = 'btn btn-borde-rojo';
+        botonAnular.textContent = 'Anular';
+        botonAnular.addEventListener('click', () => {
+          anularReunion(reunion.id);
+        });
+        tarjeta.appendChild(botonAnular);
+      }
     }
 
     listaReuniones.appendChild(tarjeta);
@@ -459,6 +482,7 @@ function renderizarReuniones(reuniones, puedeGestionar) {
 function ocultarReuniones() {
   botonAgregarReunion.classList.add('oculto');
   formularioReunionSection.classList.add('oculto');
+  formularioEditarReunionSection.classList.add('oculto');
   tituloReuniones.classList.add('oculto');
   listaReuniones.innerHTML = '';
 }
@@ -494,6 +518,7 @@ async function crearReunion(evento) {
 
 function abrirFormularioReunion() {
   botonAgregarReunion.classList.add('oculto');
+  formularioEditarReunionSection.classList.add('oculto');
   formularioReunionSection.classList.remove('oculto');
   formularioReunion.fecha.focus();
 }
@@ -501,6 +526,73 @@ function abrirFormularioReunion() {
 function cerrarFormularioReunion() {
   formularioReunionSection.classList.add('oculto');
   botonAgregarReunion.classList.remove('oculto');
+}
+
+let reunionEnEdicion = null;
+
+function abrirFormularioEditarReunion(reunion) {
+  reunionEnEdicion = reunion;
+  formularioEditarReunion.fecha.value = reunion.fecha;
+  formularioEditarReunion.tipo.value = reunion.tipo;
+  formularioEditarReunion.duracion.value = reunion.duracion || '';
+  formularioEditarReunion.observacion.value = reunion.observacion || '';
+  mensajeErrorEditarReunion.classList.add('oculto');
+  formularioEditarReunionSection.classList.remove('oculto');
+  formularioEditarReunion.fecha.focus();
+}
+
+function cerrarFormularioEditarReunion() {
+  formularioEditarReunionSection.classList.add('oculto');
+  reunionEnEdicion = null;
+  formularioEditarReunion.reset();
+}
+
+async function guardarEdicionReunion(evento) {
+  evento.preventDefault();
+  mensajeErrorEditarReunion.classList.add('oculto');
+
+  const respuesta = await fetch('/api/reuniones/' + reunionEnEdicion.id, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      fecha: formularioEditarReunion.fecha.value,
+      tipo: formularioEditarReunion.tipo.value,
+      duracion: formularioEditarReunion.duracion.value,
+      observacion: formularioEditarReunion.observacion.value
+    })
+  });
+
+  const resultado = await respuesta.json();
+
+  if (!respuesta.ok) {
+    mensajeErrorEditarReunion.textContent = resultado.error;
+    mensajeErrorEditarReunion.classList.remove('oculto');
+    return;
+  }
+
+  cerrarFormularioEditarReunion();
+  verIntegrantesDeGrupo();
+}
+
+async function anularReunion(id) {
+  if (!window.confirm('¿Anular esta reunión?')) {
+    return;
+  }
+
+  const motivo = window.prompt('Motivo de la anulación (opcional):');
+
+  const respuesta = await fetch('/api/reuniones/' + id + '/anular', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ motivo })
+  });
+
+  if (!respuesta.ok) {
+    window.alert('No se pudo anular la reunión.');
+    return;
+  }
+
+  verIntegrantesDeGrupo();
 }
 
 async function verDetalleReunion() {
@@ -1299,6 +1391,8 @@ botonRedes.addEventListener('click', mostrarRedes);
 botonCambiarContrasena.addEventListener('click', mostrarOcultarCambiarContrasena);
 botonCancelarContrasena.addEventListener('click', ocultarCambiarContrasena);
 formularioCambiarContrasena.addEventListener('submit', cambiarContrasena);
+formularioEditarReunion.addEventListener('submit', guardarEdicionReunion);
+cancelarEditarReunion.addEventListener('click', cerrarFormularioEditarReunion);
 botonReportes.addEventListener('click', cargarReportes);
 botonAdmin.addEventListener('click', cargarAdmin);
 formularioNuevaRed.addEventListener('submit', crearRed);

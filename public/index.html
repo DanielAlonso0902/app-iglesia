@@ -119,6 +119,35 @@
         </form>
       </section>
 
+      <section id="formulario-editar-reunion-section" class="oculto">
+        <h3>Editar reunión</h3>
+        <form id="formulario-editar-reunion">
+          <label for="editar-fecha-reunion">Fecha</label>
+          <input type="date" id="editar-fecha-reunion" name="fecha" required>
+
+          <label for="editar-tipo-reunion">Tipo</label>
+          <select id="editar-tipo-reunion" name="tipo">
+            <option>Grupo habitual</option>
+            <option>Servicio de red</option>
+            <option>Actividad especial</option>
+            <option>Reunión cancelada</option>
+          </select>
+
+          <label for="editar-duracion-reunion">Duración</label>
+          <input type="text" id="editar-duracion-reunion" name="duracion" placeholder="Ej. 1 hora 45 minutos">
+
+          <label for="editar-observacion-reunion">Observación</label>
+          <textarea id="editar-observacion-reunion" name="observacion" rows="2"></textarea>
+
+          <p id="mensaje-error-editar-reunion" class="alerta oculto"></p>
+
+          <div class="botones">
+            <button type="submit" class="btn btn-primario">Guardar cambios</button>
+            <button type="button" id="cancelar-editar-reunion" class="btn">Cancelar</button>
+          </div>
+        </form>
+      </section>
+
       <h3 id="titulo-reuniones" class="oculto">Reuniones</h3>
       <section id="lista-reuniones"></section>
 
