@@ -671,6 +671,33 @@ app.post('/api/logout', (req, res) => {
   res.json({ mensaje: 'Sesión cerrada.' });
 });
 
+app.patch('/api/mi-contrasena', requiereSesion, (req, res) => {
+  const contrasenaActual = req.body.contrasena_actual;
+  const contrasenaNueva = req.body.contrasena_nueva;
+
+  if (!contrasenaActual || !contrasenaNueva) {
+    res.status(400).json({ error: 'Debes escribir tu contraseña actual y la nueva.' });
+    return;
+  }
+
+  if (contrasenaNueva.length < 6) {
+    res.status(400).json({ error: 'La contraseña nueva debe tener al menos 6 caracteres.' });
+    return;
+  }
+
+  const usuario = db.prepare('SELECT id, password_hash FROM usuarios WHERE id = ?').get(req.usuario.id);
+
+  if (!bcrypt.compareSync(contrasenaActual, usuario.password_hash)) {
+    res.status(401).json({ error: 'La contraseña actual no es correcta.' });
+    return;
+  }
+
+  db.prepare('UPDATE usuarios SET password_hash = ? WHERE id = ?').run(bcrypt.hashSync(contrasenaNueva, 10), usuario.id);
+  db.prepare('DELETE FROM sesiones WHERE usuario_id = ? AND token != ?').run(usuario.id, req.cookies.sesion);
+
+  res.json({ mensaje: 'Contraseña actualizada.' });
+});
+
 app.get('/api/redes', requiereSesion, (req, res) => {
   const incluirInactivas = req.query.todas === '1' && (req.usuario.rol === 'Administrador' || req.usuario.rol === 'Pastor');
 

@@ -12,6 +12,7 @@
     <p class="lema">Amamos, vivimos la presencia de Dios, formamos discípulos y servimos al Señor.</p>
     <div id="usuario-barra" class="oculto">
       <span id="texto-usuario"></span>
+      <button id="boton-cambiar-contrasena" class="btn btn-borde">Cambiar clave</button>
       <button id="boton-cerrar-sesion" class="btn btn-borde">Cerrar sesión</button>
     </div>
   </header>
@@ -42,6 +43,27 @@
         <button id="boton-reportes" class="btn-bar oculto">Reportes</button>
         <button id="boton-admin" class="btn-bar oculto">Administrar</button>
       </nav>
+
+      <section id="seccion-cambiar-contrasena" class="oculto">
+        <h3>Cambiar mi contraseña</h3>
+        <form id="formulario-cambiar-contrasena">
+          <label for="contrasena-actual">Contraseña actual</label>
+          <input type="password" id="contrasena-actual" name="contrasena_actual" required>
+
+          <label for="contrasena-nueva">Contraseña nueva</label>
+          <input type="password" id="contrasena-nueva" name="contrasena_nueva" placeholder="Mínimo 6 caracteres" required>
+
+          <label for="contrasena-confirmar">Confirmar contraseña nueva</label>
+          <input type="password" id="contrasena-confirmar" name="confirmar" required>
+
+          <p id="mensaje-error-contrasena" class="alerta oculto"></p>
+
+          <div class="botones">
+            <button type="submit" class="btn btn-primario">Guardar</button>
+            <button type="button" id="cancelar-cambiar-contrasena" class="btn">Cancelar</button>
+          </div>
+        </form>
+      </section>
 
       <button id="boton-volver" class="oculto">← Volver</button>
       <h2 id="titulo-pagina">Nuestras Redes</h2>

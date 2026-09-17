@@ -56,6 +56,12 @@ const formularioCambioLiderRed = document.querySelector('#formulario-cambio-lide
 const selectCambioRed = document.querySelector('#cambio-red');
 const selectCambioLiderPersona = document.querySelector('#cambio-lider-persona');
 
+const botonCambiarContrasena = document.querySelector('#boton-cambiar-contrasena');
+const seccionCambiarContrasena = document.querySelector('#seccion-cambiar-contrasena');
+const formularioCambiarContrasena = document.querySelector('#formulario-cambiar-contrasena');
+const mensajeErrorContrasena = document.querySelector('#mensaje-error-contrasena');
+const botonCancelarContrasena = document.querySelector('#cancelar-cambiar-contrasena');
+
 const loginSection = document.querySelector('#login-section');
 const areaApp = document.querySelector('#area-app');
 const formularioLogin = document.querySelector('#formulario-login');
@@ -363,6 +369,51 @@ async function transferirLiderRed(evento) {
   }
 
   cargarRedes();
+}
+
+function ocultarCambiarContrasena() {
+  seccionCambiarContrasena.classList.add('oculto');
+  formularioCambiarContrasena.reset();
+}
+
+function mostrarOcultarCambiarContrasena() {
+  mensajeErrorContrasena.classList.add('oculto');
+  seccionCambiarContrasena.classList.toggle('oculto');
+
+  if (!seccionCambiarContrasena.classList.contains('oculto')) {
+    formularioCambiarContrasena.contrasena_actual.focus();
+  }
+}
+
+async function cambiarContrasena(evento) {
+  evento.preventDefault();
+  mensajeErrorContrasena.classList.add('oculto');
+
+  if (formularioCambiarContrasena.contrasena_nueva.value !== formularioCambiarContrasena.confirmar.value) {
+    mensajeErrorContrasena.textContent = 'La contraseña nueva no coincide con la confirmación.';
+    mensajeErrorContrasena.classList.remove('oculto');
+    return;
+  }
+
+  const respuesta = await fetch('/api/mi-contrasena', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contrasena_actual: formularioCambiarContrasena.contrasena_actual.value,
+      contrasena_nueva: formularioCambiarContrasena.contrasena_nueva.value
+    })
+  });
+
+  const resultado = await respuesta.json();
+
+  if (!respuesta.ok) {
+    mensajeErrorContrasena.textContent = resultado.error;
+    mensajeErrorContrasena.classList.remove('oculto');
+    return;
+  }
+
+  window.alert('Contraseña actualizada.');
+  ocultarCambiarContrasena();
 }
 
 function renderizarReuniones(reuniones, puedeGestionar) {
@@ -721,6 +772,7 @@ function mostrarRedes() {
   botonAgregar.classList.add('oculto');
   formularioSection.classList.add('oculto');
   ocultarReuniones();
+  ocultarCambiarContrasena();
   seccionBusqueda.classList.add('oculto');
   resultados.innerHTML = '';
   seccionReportes.classList.add('oculto');
@@ -740,6 +792,7 @@ function mostrarBusqueda() {
   botonAgregar.classList.add('oculto');
   formularioSection.classList.add('oculto');
   ocultarReuniones();
+  ocultarCambiarContrasena();
   seccionBusqueda.classList.remove('oculto');
   mensajeBusqueda.classList.add('oculto');
   resultados.innerHTML = '';
@@ -830,6 +883,7 @@ function barrasDeEtapas(porEtapa, totalPersonas) {
 async function cargarReportes() {
   pantalla = 'reportes';
   tituloPagina.textContent = 'Reportes';
+  ocultarCambiarContrasena();
   contenedorRedes.classList.add('oculto');
   contenedorDetalle.classList.add('oculto');
   botonVolver.classList.add('oculto');
@@ -926,6 +980,7 @@ async function verReporteRed(redId) {
 async function cargarAdmin() {
   pantalla = 'admin';
   tituloPagina.textContent = 'Administrar';
+  ocultarCambiarContrasena();
   contenedorRedes.classList.add('oculto');
   contenedorDetalle.classList.add('oculto');
   botonVolver.classList.add('oculto');
@@ -1225,7 +1280,8 @@ formularioLogin.addEventListener('submit', async (evento) => {
 
 botonCerrarSesion.addEventListener('click', async () => {
   await fetch('/api/logout', { method: 'POST' });
-  mostrarLogin();
+  ocultarCambiarContrasena();
+  cerrarSesionFrontend();
 });
 
 botonVolver.addEventListener('click', volver);
@@ -1240,6 +1296,9 @@ formularioReunion.addEventListener('submit', crearReunion);
 formularioBusqueda.addEventListener('submit', buscarPersonas);
 botonBuscar.addEventListener('click', mostrarBusqueda);
 botonRedes.addEventListener('click', mostrarRedes);
+botonCambiarContrasena.addEventListener('click', mostrarOcultarCambiarContrasena);
+botonCancelarContrasena.addEventListener('click', ocultarCambiarContrasena);
+formularioCambiarContrasena.addEventListener('submit', cambiarContrasena);
 botonReportes.addEventListener('click', cargarReportes);
 botonAdmin.addEventListener('click', cargarAdmin);
 formularioNuevaRed.addEventListener('submit', crearRed);
