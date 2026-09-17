@@ -144,7 +144,7 @@ async function verIntegrantesDeGrupo() {
   const integrantes = resultado;
   pantalla = 'integrantes';
 
-  const puedeGestionar = usuarioActual && (usuarioActual.rol === 'Administrador' || usuarioActual.rol === 'Líder de Grupo');
+  const puedeGestionar = usuarioActual && (usuarioActual.rol === 'Administrador' || usuarioActual.rol === 'Pastor' || usuarioActual.rol === 'Líder de Red' || usuarioActual.rol === 'Líder de Grupo');
   if (puedeGestionar) {
     botonAgregar.classList.remove('oculto');
   } else {
@@ -317,7 +317,7 @@ async function verDetalleReunion() {
   formularioSection.classList.add('oculto');
   ocultarReuniones();
 
-  const puedeGestionar = usuarioActual && (usuarioActual.rol === 'Administrador' || usuarioActual.rol === 'Líder de Grupo');
+  const puedeGestionar = usuarioActual && (usuarioActual.rol === 'Administrador' || usuarioActual.rol === 'Pastor' || usuarioActual.rol === 'Líder de Red' || usuarioActual.rol === 'Líder de Grupo');
 
   let html = '<h3>Asistencia</h3><div id="asistencia-lista">';
 

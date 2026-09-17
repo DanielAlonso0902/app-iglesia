@@ -68,7 +68,20 @@ function puedeVerGrupo(grupoId, usuario) {
     return !!pertenencia;
   }
 
-  return true;
+  if (usuario.rol === 'Líder de Red') {
+    if (!usuario.persona_id) return false;
+
+    const pertenencia = db.prepare(`
+      SELECT pr.id
+      FROM persona_red pr
+      JOIN grupos g ON g.red_id = pr.red_id
+      WHERE pr.persona_id = ? AND pr.activo = 1 AND g.id = ?
+    `).get(usuario.persona_id, grupoId);
+
+    return !!pertenencia;
+  }
+
+  return false;
 }
 
 app.post('/api/login', (req, res) => {
@@ -217,7 +230,7 @@ app.get('/api/grupos/:id/reuniones', requiereSesion, (req, res) => {
   res.json(reuniones);
 });
 
-app.post('/api/grupos/:id/reuniones', requiereSesion, requiereRol(['Administrador', 'Líder de Grupo']), (req, res) => {
+app.post('/api/grupos/:id/reuniones', requiereSesion, requiereRol(['Administrador', 'Pastor', 'Líder de Red', 'Líder de Grupo']), (req, res) => {
   const grupoId = Number(req.params.id);
 
   if (req.usuario.rol !== 'Administrador') {
@@ -280,7 +293,7 @@ app.get('/api/reuniones/:id', requiereSesion, (req, res) => {
   res.json({ reunion, integrantes, visitantes });
 });
 
-app.post('/api/reuniones/:id/asistencia', requiereSesion, requiereRol(['Administrador', 'Líder de Grupo']), (req, res) => {
+app.post('/api/reuniones/:id/asistencia', requiereSesion, requiereRol(['Administrador', 'Pastor', 'Líder de Red', 'Líder de Grupo']), (req, res) => {
   const reunionId = Number(req.params.id);
   const reunion = db.prepare('SELECT * FROM reuniones WHERE id = ?').get(reunionId);
 
@@ -321,7 +334,7 @@ app.post('/api/reuniones/:id/asistencia', requiereSesion, requiereRol(['Administ
   res.json({ ok: true, personaId, asistio });
 });
 
-app.post('/api/reuniones/:id/visitantes', requiereSesion, requiereRol(['Administrador', 'Líder de Grupo']), (req, res) => {
+app.post('/api/reuniones/:id/visitantes', requiereSesion, requiereRol(['Administrador', 'Pastor', 'Líder de Red', 'Líder de Grupo']), (req, res) => {
   const reunionId = Number(req.params.id);
   const reunion = db.prepare('SELECT * FROM reuniones WHERE id = ?').get(reunionId);
 
@@ -355,7 +368,7 @@ app.post('/api/reuniones/:id/visitantes', requiereSesion, requiereRol(['Administ
 
 const rolesValidos = ['Líder', 'Apoyo', 'Anfitrión', 'Integrante'];
 
-app.post('/api/grupos/:id/integrantes', requiereSesion, requiereRol(['Administrador', 'Líder de Grupo']), (req, res) => {
+app.post('/api/grupos/:id/integrantes', requiereSesion, requiereRol(['Administrador', 'Pastor', 'Líder de Red', 'Líder de Grupo']), (req, res) => {
   const grupoId = Number(req.params.id);
 
   if (req.usuario.rol !== 'Administrador') {
