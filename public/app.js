@@ -42,6 +42,15 @@ const selectGrupoRed = document.querySelector('#grupo-red');
 const listaAdminRedes = document.querySelector('#lista-admin-redes');
 const listaAdminGrupos = document.querySelector('#lista-admin-grupos');
 
+const formularioUsuario = document.querySelector('#formulario-usuario');
+const selectUsuarioPersona = document.querySelector('#usuario-persona');
+const selectUsuarioRol = document.querySelector('#usuario-rol');
+const campoRedUsuario = document.querySelector('#campo-red-usuario');
+const selectUsuarioRed = document.querySelector('#usuario-red');
+const campoGrupoUsuario = document.querySelector('#campo-grupo-usuario');
+const selectUsuarioGrupo = document.querySelector('#usuario-grupo');
+const listaUsuarios = document.querySelector('#lista-usuarios');
+
 const loginSection = document.querySelector('#login-section');
 const areaApp = document.querySelector('#area-app');
 const formularioLogin = document.querySelector('#formulario-login');
@@ -840,12 +849,28 @@ async function cargarListasAdmin() {
   const respuestaRedes = await fetch('/api/redes');
   const redes = await respuestaRedes.json();
 
-  selectGrupoRed.innerHTML = redes.map((red) => '<option value="' + red.id + '">' + red.nombre + '</option>').join('');
+  const opcionesRedes = redes.map((red) => '<option value="' + red.id + '">' + red.nombre + '</option>').join('');
+  selectGrupoRed.innerHTML = opcionesRedes;
+  selectUsuarioRed.innerHTML = opcionesRedes;
   renderAdminRedes(redes);
 
   const respuestaGrupos = await fetch('/api/grupos?todas=1');
   const grupos = await respuestaGrupos.json();
   renderAdminGrupos(grupos);
+  selectUsuarioGrupo.innerHTML = grupos
+    .filter((grupo) => grupo.activo === 1)
+    .map((grupo) => '<option value="' + grupo.id + '">' + grupo.nombre + ' (' + grupo.red + ')</option>')
+    .join('');
+
+  const respuestaPersonas = await fetch('/api/personas');
+  const personas = await respuestaPersonas.json();
+  selectUsuarioPersona.innerHTML = personas
+    .map((persona) => '<option value="' + persona.id + '">' + persona.nombre_completo + '</option>')
+    .join('');
+
+  const respuestaUsuarios = await fetch('/api/usuarios');
+  const usuarios = await respuestaUsuarios.json();
+  renderUsuarios(usuarios);
 }
 
 function renderAdminRedes(redes) {
@@ -903,6 +928,119 @@ async function cambiarEstadoGrupo(grupoId, activo) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ activo })
   });
+  await cargarListasAdmin();
+}
+
+function renderUsuarios(usuarios) {
+  listaUsuarios.innerHTML = '';
+
+  if (usuarios.length === 0) {
+    listaUsuarios.innerHTML = '<p class="vacio">No hay usuarios creados.</p>';
+    return;
+  }
+
+  usuarios.forEach((usuario) => {
+    const tarjeta = document.createElement('article');
+    tarjeta.className = 'tarjeta tarjeta-persona';
+    tarjeta.innerHTML = '<strong>' + (usuario.nombre_completo || 'Sin persona') + '</strong>' +
+      '<span>' + usuario.rol + ' · ' + usuario.cedula + (usuario.activo === 1 ? ' · Activo' : ' · Inactivo') + '</span>' +
+      (usuario.activo === 1
+        ? '<button class="btn btn-borde-rojo">Desactivar</button><button class="btn btn-secundario">Cambiar contraseña</button>'
+        : '<button class="btn btn-secundario">Activar</button>');
+
+    const botonEstado = tarjeta.querySelector('button');
+    if (usuario.activo === 1) {
+      botonEstado.addEventListener('click', () => cambiarEstadoUsuario(usuario.id, 0));
+    } else {
+      botonEstado.addEventListener('click', () => cambiarEstadoUsuario(usuario.id, 1));
+    }
+
+    if (usuario.activo === 1) {
+      tarjeta.querySelectorAll('button')[1].addEventListener('click', () => cambiarContrasenaUsuario(usuario.id));
+    }
+
+    listaUsuarios.appendChild(tarjeta);
+  });
+}
+
+async function cambiarEstadoUsuario(usuarioId, activo) {
+  const respuesta = await fetch('/api/usuarios/' + usuarioId + '/estado', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ activo })
+  });
+
+  const resultado = await respuesta.json();
+
+  if (!respuesta.ok) {
+    mensajeErrorAdmin.textContent = resultado.error;
+    mensajeErrorAdmin.classList.remove('oculto');
+    return;
+  }
+
+  await cargarListasAdmin();
+}
+
+async function cambiarContrasenaUsuario(usuarioId) {
+  const contrasena = window.prompt('Nueva contraseña (mínimo 6 caracteres):');
+
+  if (!contrasena) {
+    return;
+  }
+
+  const respuesta = await fetch('/api/usuarios/' + usuarioId + '/contrasena', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ contrasena })
+  });
+
+  const resultado = await respuesta.json();
+
+  if (!respuesta.ok) {
+    mensajeErrorAdmin.textContent = resultado.error;
+    mensajeErrorAdmin.classList.remove('oculto');
+    return;
+  }
+
+  mensajeErrorAdmin.classList.add('oculto');
+  window.alert('Contraseña actualizada.');
+}
+
+function actualizarCamposUsuario() {
+  const rol = selectUsuarioRol.value;
+  campoRedUsuario.classList.toggle('oculto', rol !== 'Líder de Red');
+  campoGrupoUsuario.classList.toggle('oculto', rol !== 'Líder de Grupo');
+}
+
+async function crearUsuario(evento) {
+  evento.preventDefault();
+  mensajeErrorAdmin.classList.add('oculto');
+
+  const datos = {
+    persona_id: selectUsuarioPersona.value,
+    rol: selectUsuarioRol.value,
+    red_id: selectUsuarioRed.value,
+    grupo_id: selectUsuarioGrupo.value,
+    cedula: formularioUsuario.cedula.value,
+    contrasena: formularioUsuario.contrasena.value
+  };
+
+  const respuesta = await fetch('/api/usuarios', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(datos)
+  });
+
+  const resultado = await respuesta.json();
+
+  if (!respuesta.ok) {
+    mensajeErrorAdmin.textContent = resultado.error;
+    mensajeErrorAdmin.classList.remove('oculto');
+    return;
+  }
+
+  formularioUsuario.reset();
+  actualizarCamposUsuario();
   await cargarListasAdmin();
 }
 
@@ -1007,5 +1145,7 @@ botonReportes.addEventListener('click', cargarReportes);
 botonAdmin.addEventListener('click', cargarAdmin);
 formularioNuevaRed.addEventListener('submit', crearRed);
 formularioNuevoGrupo.addEventListener('submit', crearGrupo);
+formularioUsuario.addEventListener('submit', crearUsuario);
+selectUsuarioRol.addEventListener('change', actualizarCamposUsuario);
 
 iniciar();

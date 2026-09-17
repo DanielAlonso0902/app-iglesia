@@ -212,7 +212,8 @@ footer {
 }
 
 #formulario-nueva-red,
-#formulario-nuevo-grupo {
+#formulario-nuevo-grupo,
+#formulario-usuario {
   background-color: var(--blanco);
   border: 1px solid #dbe3f0;
   border-radius: 0.75rem;
@@ -221,13 +222,15 @@ footer {
 }
 
 #formulario-nueva-red h4,
-#formulario-nuevo-grupo h4 {
+#formulario-nuevo-grupo h4,
+#formulario-usuario h4 {
   margin: 0 0 0.25rem;
   color: var(--azul-oscuro);
 }
 
 #formulario-nueva-red label,
-#formulario-nuevo-grupo label {
+#formulario-nuevo-grupo label,
+#formulario-usuario label {
   display: block;
   font-weight: 600;
   font-size: 0.9rem;
@@ -237,7 +240,9 @@ footer {
 
 #formulario-nueva-red input,
 #formulario-nuevo-grupo input,
-#formulario-nuevo-grupo select {
+#formulario-nuevo-grupo select,
+#formulario-usuario input,
+#formulario-usuario select {
   width: 100%;
   padding: 0.65rem 0.8rem;
   border: 1px solid #c6d0e2;
@@ -250,7 +255,9 @@ footer {
 
 #formulario-nueva-red input:focus,
 #formulario-nuevo-grupo input:focus,
-#formulario-nuevo-grupo select:focus {
+#formulario-nuevo-grupo select:focus,
+#formulario-usuario input:focus,
+#formulario-usuario select:focus {
   outline: none;
   border-color: var(--azul-rey);
 }

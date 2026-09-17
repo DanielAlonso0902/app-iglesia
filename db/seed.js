@@ -49,6 +49,9 @@ const ana = Number(resultadoAna.lastInsertRowid);
 const resultadoMaria = insertarPersona.run('María Ramírez', '1992-11-30', 'Femenino', '3005550303', 'Casada', 1, 0, 1);
 const maria = Number(resultadoMaria.lastInsertRowid);
 
+const resultadoLaura = insertarPersona.run('Laura Torres', '1998-04-12', 'Femenino', '3105550404', 'Soltera', 1, 1, 1);
+const laura = Number(resultadoLaura.lastInsertRowid);
+
 insertarPersonaGrupo.run(carlos, grupo200, 'Líder', '2026-01-15', null, 1);
 insertarPersonaGrupo.run(carlos, grupo100, 'Integrante', '2025-02-01', '2025-12-31', 0);
 insertarPersonaGrupo.run(ana, grupo100, 'Apoyo', '2026-02-10', null, 1);

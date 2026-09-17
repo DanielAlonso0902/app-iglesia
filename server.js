@@ -368,6 +368,114 @@ app.patch('/api/grupos/:id/estado', requiereSesion, requiereRol(['Administrador'
   res.json({ id: grupoId, activo });
 });
 
+app.get('/api/usuarios', requiereSesion, requiereRol(['Administrador', 'Pastor']), (req, res) => {
+  const usuarios = db.prepare(`
+    SELECT usuarios.id, usuarios.cedula, usuarios.rol, usuarios.activo, personas.nombre_completo
+    FROM usuarios
+    LEFT JOIN personas ON personas.id = usuarios.persona_id
+    ORDER BY usuarios.rol, personas.nombre_completo
+  `).all();
+  res.json(usuarios);
+});
+
+app.post('/api/usuarios', requiereSesion, requiereRol(['Administrador', 'Pastor']), (req, res) => {
+  const personaId = Number(req.body.persona_id);
+  const rol = req.body.rol;
+  const cedula = req.body.cedula || '';
+  const contrasena = req.body.contrasena;
+
+  if (!personaId || !rol || !cedula || !contrasena) {
+    res.status(400).json({ error: 'La persona, el rol, la cédula y la contraseña son obligatorios.' });
+    return;
+  }
+
+  if (contrasena.length < 6) {
+    res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres.' });
+    return;
+  }
+
+  if (!['Administrador', 'Pastor', 'Líder de Red', 'Líder de Grupo'].includes(rol)) {
+    res.status(400).json({ error: 'Rol no válido.' });
+    return;
+  }
+
+  if (!db.prepare('SELECT id FROM personas WHERE id = ?').get(personaId)) {
+    res.status(400).json({ error: 'La persona no existe.' });
+    return;
+  }
+
+  if (db.prepare('SELECT id FROM usuarios WHERE persona_id = ?').get(personaId)) {
+    res.status(400).json({ error: 'Esa persona ya tiene usuario.' });
+    return;
+  }
+
+  if (db.prepare('SELECT id FROM usuarios WHERE cedula = ?').get(cedula)) {
+    res.status(400).json({ error: 'Esa cédula ya está en uso.' });
+    return;
+  }
+
+  if (rol === 'Líder de Red') {
+    const redId = Number(req.body.red_id);
+    if (!db.prepare('SELECT id FROM redes WHERE id = ? AND activo = 1').get(redId)) {
+      res.status(400).json({ error: 'Debes elegir una red activa para el líder de red.' });
+      return;
+    }
+    db.prepare('INSERT INTO persona_red (persona_id, red_id, fecha_inicio, activo) VALUES (?, ?, ?, 1)')
+      .run(personaId, redId, new Date().toISOString().slice(0, 10));
+  }
+
+  if (rol === 'Líder de Grupo') {
+    const grupoId = Number(req.body.grupo_id);
+    if (!db.prepare('SELECT id FROM grupos WHERE id = ? AND activo = 1').get(grupoId)) {
+      res.status(400).json({ error: 'Debes elegir un grupo activo para el líder de grupo.' });
+      return;
+    }
+    db.prepare('INSERT INTO persona_grupo (persona_id, grupo_id, rol, fecha_inicio, activo) VALUES (?, ?, ?, ?, 1)')
+      .run(personaId, grupoId, 'Líder', new Date().toISOString().slice(0, 10));
+  }
+
+  const resultado = db.prepare('INSERT INTO usuarios (cedula, password_hash, rol, persona_id) VALUES (?, ?, ?, ?)')
+    .run(cedula, bcrypt.hashSync(contrasena, 10), rol, personaId);
+
+  res.status(201).json({ id: Number(resultado.lastInsertRowid), cedula, rol });
+});
+
+app.patch('/api/usuarios/:id/estado', requiereSesion, requiereRol(['Administrador', 'Pastor']), (req, res) => {
+  const usuarioId = Number(req.params.id);
+
+  if (usuarioId === req.usuario.id) {
+    res.status(400).json({ error: 'No puedes desactivar tu propio usuario.' });
+    return;
+  }
+
+  if (!db.prepare('SELECT id FROM usuarios WHERE id = ?').get(usuarioId)) {
+    res.status(404).json({ error: 'Usuario no encontrado.' });
+    return;
+  }
+
+  const activo = req.body.activo ? 1 : 0;
+  db.prepare('UPDATE usuarios SET activo = ? WHERE id = ?').run(activo, usuarioId);
+  res.json({ id: usuarioId, activo });
+});
+
+app.patch('/api/usuarios/:id/contrasena', requiereSesion, requiereRol(['Administrador', 'Pastor']), (req, res) => {
+  const usuarioId = Number(req.params.id);
+  const contrasena = req.body.contrasena;
+
+  if (!contrasena || contrasena.length < 6) {
+    res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres.' });
+    return;
+  }
+
+  if (!db.prepare('SELECT id FROM usuarios WHERE id = ?').get(usuarioId)) {
+    res.status(404).json({ error: 'Usuario no encontrado.' });
+    return;
+  }
+
+  db.prepare('UPDATE usuarios SET password_hash = ? WHERE id = ?').run(bcrypt.hashSync(contrasena, 10), usuarioId);
+  res.json({ mensaje: 'Contraseña actualizada.' });
+});
+
 app.post('/api/login', (req, res) => {
   const cedula = req.body.cedula;
   const contrasena = req.body.contrasena;
@@ -472,27 +580,22 @@ app.get('/api/grupos/:id/integrantes', requiereSesion, (req, res) => {
 
 app.get('/api/personas', requiereSesion, (req, res) => {
   const q = (req.query.q || '').trim();
-  const busqueda = '%' + q + '%';
 
-  let personas;
-  if (q) {
-    personas = db.prepare(`
-      SELECT p.id, p.nombre_completo, p.celular, p.activo AS persona_activo, u.cedula
-      FROM personas p
-      LEFT JOIN usuarios u ON u.persona_id = p.id
-      WHERE p.nombre_completo LIKE ? OR p.celular LIKE ? OR u.cedula LIKE ?
-      ORDER BY p.nombre_completo
-      LIMIT 50
-    `).all(busqueda, busqueda, busqueda);
-  } else {
-    personas = db.prepare(`
-      SELECT p.id, p.nombre_completo, p.celular, p.activo AS persona_activo, u.cedula
-      FROM personas p
-      LEFT JOIN usuarios u ON u.persona_id = p.id
-      ORDER BY p.nombre_completo
-      LIMIT 50
-    `).all();
+  if (!q) {
+    const personas = db.prepare('SELECT id, nombre_completo FROM personas ORDER BY nombre_completo').all();
+    res.json(personas);
+    return;
   }
+
+  const busqueda = '%' + q + '%';
+  const personas = db.prepare(`
+    SELECT p.id, p.nombre_completo, p.celular, p.activo AS persona_activo, u.cedula
+    FROM personas p
+    LEFT JOIN usuarios u ON u.persona_id = p.id
+    WHERE p.nombre_completo LIKE ? OR p.celular LIKE ? OR u.cedula LIKE ?
+    ORDER BY p.nombre_completo
+    LIMIT 50
+  `).all(busqueda, busqueda, busqueda);
 
   for (const persona of personas) {
     persona.grupos = db.prepare(`

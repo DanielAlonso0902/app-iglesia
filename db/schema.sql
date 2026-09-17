@@ -65,7 +65,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
   cedula TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
   rol TEXT NOT NULL CHECK (rol IN ('Administrador', 'Pastor', 'Líder de Red', 'Líder de Grupo')),
-  persona_id INTEGER,
+  persona_id INTEGER UNIQUE,
   activo INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (persona_id) REFERENCES personas(id)

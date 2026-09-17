@@ -152,6 +152,40 @@
 
         <h4>Grupos existentes</h4>
         <section id="lista-admin-grupos"></section>
+
+        <h4>Usuarios</h4>
+        <form id="formulario-usuario">
+          <label for="usuario-persona">Persona</label>
+          <select id="usuario-persona" name="persona_id" required></select>
+
+          <label for="usuario-rol">Rol</label>
+          <select id="usuario-rol" name="rol" required>
+            <option value="Líder de Red">Líder de Red</option>
+            <option value="Líder de Grupo">Líder de Grupo</option>
+            <option value="Pastor">Pastor</option>
+            <option value="Administrador">Administrador</option>
+          </select>
+
+          <div id="campo-red-usuario" class="oculto">
+            <label for="usuario-red">Red</label>
+            <select id="usuario-red" name="red_id"></select>
+          </div>
+
+          <div id="campo-grupo-usuario" class="oculto">
+            <label for="usuario-grupo">Grupo</label>
+            <select id="usuario-grupo" name="grupo_id"></select>
+          </div>
+
+          <label for="usuario-cedula">Cédula</label>
+          <input type="text" id="usuario-cedula" name="cedula" placeholder="Ej. 1045678901" required>
+
+          <label for="usuario-contrasena">Contraseña</label>
+          <input type="password" id="usuario-contrasena" name="contrasena" placeholder="Mínimo 6 caracteres" required>
+
+          <div class="botones"><button type="submit" class="btn btn-primario">Crear usuario</button></div>
+        </form>
+
+        <section id="lista-usuarios"></section>
       </section>
     </div>
   </main>
