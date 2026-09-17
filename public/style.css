@@ -275,6 +275,60 @@ footer {
   margin-top: 1rem;
 }
 
+#login-section {
+  display: flex;
+  justify-content: center;
+  padding-top: 2rem;
+}
+
+.tarjeta-login {
+  background-color: var(--blanco);
+  border-radius: 0.9rem;
+  box-shadow: 0 4px 14px rgba(34, 48, 62, 0.12);
+  padding: 1.75rem;
+  width: 100%;
+  max-width: 24rem;
+}
+
+.tarjeta-login h2 {
+  margin: 0 0 0.25rem;
+  text-align: center;
+  color: var(--azul-oscuro);
+}
+
+.boton-ancho {
+  width: 100%;
+  margin-top: 1.25rem;
+}
+
+.nota-login {
+  margin-top: 1.25rem;
+  font-size: 0.8rem;
+  color: #6b7a8a;
+  text-align: center;
+}
+
+#usuario-barra {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  font-size: 0.9rem;
+}
+
+.btn-borde {
+  background-color: transparent;
+  color: var(--blanco);
+  border: 1.5px solid rgba(255, 255, 255, 0.7);
+  padding: 0.35rem 0.9rem;
+  font-size: 0.85rem;
+}
+
+.btn-borde:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
 @media (min-width: 600px) {
   #lista-redes {
     grid-template-columns: repeat(2, 1fr);

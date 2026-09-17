@@ -9,11 +9,45 @@ const formulario = document.querySelector('#formulario-integrante');
 const botonCancelar = document.querySelector('#cancelar-formulario');
 const mensajeError = document.querySelector('#mensaje-error');
 
+const loginSection = document.querySelector('#login-section');
+const areaApp = document.querySelector('#area-app');
+const formularioLogin = document.querySelector('#formulario-login');
+const mensajeErrorLogin = document.querySelector('#mensaje-error-login');
+const usuarioBarra = document.querySelector('#usuario-barra');
+const textoUsuario = document.querySelector('#texto-usuario');
+const botonCerrarSesion = document.querySelector('#boton-cerrar-sesion');
+
 let pantalla = 'redes';
 let redActual = null;
 let grupoActual = null;
 
+async function iniciar() {
+  const respuesta = await fetch('/api/me');
+
+  if (respuesta.ok) {
+    const usuario = await respuesta.json();
+    mostrarApp(usuario);
+  } else {
+    mostrarLogin();
+  }
+}
+
+function mostrarLogin() {
+  loginSection.classList.remove('oculto');
+  areaApp.classList.add('oculto');
+  usuarioBarra.classList.add('oculto');
+}
+
+function mostrarApp(usuario) {
+  loginSection.classList.add('oculto');
+  areaApp.classList.remove('oculto');
+  usuarioBarra.classList.remove('oculto');
+  textoUsuario.textContent = 'Cédula ' + usuario.cedula + ' · ' + usuario.rol;
+  cargarRedes();
+}
+
 async function cargarRedes() {
+  contenedorRedes.innerHTML = '';
   const respuesta = await fetch('/api/redes');
   const redes = await respuesta.json();
 
@@ -159,9 +193,41 @@ function mostrarRedes() {
   formularioSection.classList.add('oculto');
 }
 
+formularioLogin.addEventListener('submit', async (evento) => {
+  evento.preventDefault();
+  mensajeErrorLogin.classList.add('oculto');
+
+  const datos = {
+    cedula: formularioLogin.cedula.value,
+    contrasena: formularioLogin.contrasena.value
+  };
+
+  const respuesta = await fetch('/api/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(datos)
+  });
+
+  const resultado = await respuesta.json();
+
+  if (!respuesta.ok) {
+    mensajeErrorLogin.textContent = resultado.error;
+    mensajeErrorLogin.classList.remove('oculto');
+    return;
+  }
+
+  formularioLogin.reset();
+  mostrarApp(resultado);
+});
+
+botonCerrarSesion.addEventListener('click', async () => {
+  await fetch('/api/logout', { method: 'POST' });
+  mostrarLogin();
+});
+
 botonVolver.addEventListener('click', volver);
 botonAgregar.addEventListener('click', abrirFormulario);
 botonCancelar.addEventListener('click', cerrarFormulario);
 formulario.addEventListener('submit', crearIntegrante);
 
-cargarRedes();
+iniciar();
