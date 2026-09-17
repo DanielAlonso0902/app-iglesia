@@ -1,4 +1,7 @@
 const express = require('express');
+const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
+const cookieParser = require('cookie-parser');
 const db = require('./db');
 
 const app = express();
@@ -6,12 +9,73 @@ const PORT = 3000;
 
 app.use(express.static('public'));
 app.use(express.json());
+app.use(cookieParser());
 
 app.get('/api/estado', (req, res) => {
   res.json({
     mensaje: 'El servidor está funcionando',
     hora: new Date().toISOString()
   });
+});
+
+function requiereSesion(req, res, next) {
+  const token = req.cookies.sesion;
+
+  if (!token) {
+    res.status(401).json({ error: 'No has iniciado sesión.' });
+    return;
+  }
+
+  const sesion = db.prepare(`
+    SELECT sesiones.token, usuarios.id, usuarios.cedula, usuarios.rol, usuarios.activo AS usuario_activo
+    FROM sesiones
+    JOIN usuarios ON usuarios.id = sesiones.usuario_id
+    WHERE sesiones.token = ?
+  `).get(token);
+
+  if (!sesion || sesion.usuario_activo !== 1) {
+    res.status(401).json({ error: 'Sesión no válida.' });
+    return;
+  }
+
+  req.usuario = sesion;
+  next();
+}
+
+app.post('/api/login', (req, res) => {
+  const cedula = req.body.cedula;
+  const contrasena = req.body.contrasena;
+
+  if (!cedula || !contrasena) {
+    res.status(400).json({ error: 'La cédula y la contraseña son obligatorias.' });
+    return;
+  }
+
+  const usuario = db.prepare('SELECT * FROM usuarios WHERE cedula = ?').get(cedula);
+
+  if (!usuario || usuario.activo !== 1 || !bcrypt.compareSync(contrasena, usuario.password_hash)) {
+    res.status(401).json({ error: 'Cédula o contraseña incorrecta.' });
+    return;
+  }
+
+  const token = crypto.randomBytes(32).toString('hex');
+  db.prepare('INSERT INTO sesiones (token, usuario_id) VALUES (?, ?)').run(token, usuario.id);
+
+  res.cookie('sesion', token, { httpOnly: true, sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000 });
+  res.json({ id: usuario.id, cedula: usuario.cedula, rol: usuario.rol });
+});
+
+app.get('/api/me', requiereSesion, (req, res) => {
+  res.json({ id: req.usuario.id, cedula: req.usuario.cedula, rol: req.usuario.rol });
+});
+
+app.post('/api/logout', (req, res) => {
+  const token = req.cookies.sesion;
+  if (token) {
+    db.prepare('DELETE FROM sesiones WHERE token = ?').run(token);
+  }
+  res.clearCookie('sesion');
+  res.json({ mensaje: 'Sesión cerrada.' });
 });
 
 app.get('/api/redes', (req, res) => {

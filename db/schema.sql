@@ -68,3 +68,10 @@ CREATE TABLE IF NOT EXISTS usuarios (
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (persona_id) REFERENCES personas(id)
 );
+
+CREATE TABLE IF NOT EXISTS sesiones (
+  token TEXT PRIMARY KEY,
+  usuario_id INTEGER NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+);
