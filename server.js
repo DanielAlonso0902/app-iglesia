@@ -476,6 +476,113 @@ app.patch('/api/usuarios/:id/contrasena', requiereSesion, requiereRol(['Administ
   res.json({ mensaje: 'Contraseña actualizada.' });
 });
 
+app.post('/api/grupos/:id/integrantes/:personaId/retirar', requiereSesion, requiereRol(['Administrador', 'Pastor', 'Líder de Red', 'Líder de Grupo']), (req, res) => {
+  const grupoId = Number(req.params.id);
+  const personaId = Number(req.params.personaId);
+
+  if (!puedeVerGrupo(grupoId, req.usuario)) {
+    res.status(403).json({ error: 'No tienes permiso para este grupo.' });
+    return;
+  }
+
+  const pertenencia = db.prepare('SELECT id FROM persona_grupo WHERE grupo_id = ? AND persona_id = ? AND activo = 1').get(grupoId, personaId);
+
+  if (!pertenencia) {
+    res.status(404).json({ error: 'Esa persona no es integrante activo del grupo.' });
+    return;
+  }
+
+  db.prepare('UPDATE persona_grupo SET fecha_fin = ?, activo = 0 WHERE grupo_id = ? AND persona_id = ? AND activo = 1')
+    .run(new Date().toISOString().slice(0, 10), grupoId, personaId);
+
+  res.json({ mensaje: 'Integrante retirado del grupo.' });
+});
+
+app.post('/api/grupos/:id/transferir-lider', requiereSesion, requiereRol(['Administrador', 'Pastor', 'Líder de Red']), (req, res) => {
+  const grupoId = Number(req.params.id);
+  const personaId = Number(req.body.persona_id);
+
+  if (!personaId) {
+    res.status(400).json({ error: 'Debes elegir el nuevo líder.' });
+    return;
+  }
+
+  if (!puedeVerGrupo(grupoId, req.usuario)) {
+    res.status(403).json({ error: 'No tienes permiso para este grupo.' });
+    return;
+  }
+
+  if (!db.prepare('SELECT id FROM personas WHERE id = ?').get(personaId)) {
+    res.status(400).json({ error: 'La persona no existe.' });
+    return;
+  }
+
+  if (!db.prepare('SELECT id FROM persona_grupo WHERE grupo_id = ? AND persona_id = ? AND activo = 1').get(grupoId, personaId)) {
+    res.status(400).json({ error: 'El nuevo líder debe ser integrante activo del grupo.' });
+    return;
+  }
+
+  const yaEsLider = db.prepare("SELECT id FROM persona_grupo WHERE grupo_id = ? AND persona_id = ? AND rol = 'Líder' AND activo = 1").get(grupoId, personaId);
+
+  if (yaEsLider) {
+    res.status(400).json({ error: 'Esa persona ya es líder del grupo.' });
+    return;
+  }
+
+  const hoy = new Date().toISOString().slice(0, 10);
+
+  const cerrar = db.transaction(() => {
+    db.prepare("UPDATE persona_grupo SET fecha_fin = ?, activo = 0 WHERE grupo_id = ? AND rol = 'Líder' AND activo = 1").run(hoy, grupoId);
+
+    const miembro = db.prepare('SELECT id FROM persona_grupo WHERE grupo_id = ? AND persona_id = ? AND activo = 1').get(grupoId, personaId);
+    if (!miembro) {
+      throw new Error('El nuevo líder debe ser integrante activo del grupo.');
+    }
+
+    db.prepare("UPDATE persona_grupo SET rol = 'Líder' WHERE id = ?").run(miembro.id);
+  });
+
+  try {
+    cerrar();
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+    return;
+  }
+
+  res.json({ mensaje: 'Liderazgo transferido.' });
+});
+
+app.post('/api/redes/:id/transferir-lider', requiereSesion, requiereRol(['Administrador', 'Pastor']), (req, res) => {
+  const redId = Number(req.params.id);
+  const personaId = Number(req.body.persona_id);
+
+  if (!personaId) {
+    res.status(400).json({ error: 'Debes elegir el nuevo líder.' });
+    return;
+  }
+
+  if (!db.prepare('SELECT id FROM personas WHERE id = ?').get(personaId)) {
+    res.status(400).json({ error: 'La persona no existe.' });
+    return;
+  }
+
+  if (db.prepare('SELECT id FROM persona_red WHERE red_id = ? AND persona_id = ? AND activo = 1').get(redId, personaId)) {
+    res.status(400).json({ error: 'Esa persona ya es líder de la red.' });
+    return;
+  }
+
+  const hoy = new Date().toISOString().slice(0, 10);
+
+  const cerrar = db.transaction(() => {
+    db.prepare('UPDATE persona_red SET fecha_fin = ?, activo = 0 WHERE red_id = ? AND activo = 1').run(hoy, redId);
+    db.prepare('INSERT INTO persona_red (persona_id, red_id, fecha_inicio, activo) VALUES (?, ?, ?, 1)').run(personaId, redId, hoy);
+  });
+
+  cerrar();
+
+  res.json({ mensaje: 'Liderazgo de la red transferido.' });
+});
+
 app.post('/api/login', (req, res) => {
   const cedula = req.body.cedula;
   const contrasena = req.body.contrasena;

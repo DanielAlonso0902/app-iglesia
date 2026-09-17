@@ -142,6 +142,7 @@ footer {
 
 .integrante {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.75rem;
   background-color: var(--blanco);
@@ -150,6 +151,59 @@ footer {
   box-shadow: 0 2px 6px rgba(34, 48, 62, 0.1);
   margin-bottom: 0.75rem;
   cursor: pointer;
+}
+
+.btn-mini {
+  margin-left: auto;
+}
+
+.tarjeta select {
+  width: 100%;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid #c6d0e2;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  font-family: inherit;
+  color: var(--texto);
+  background-color: var(--blanco);
+  margin-bottom: 0.6rem;
+}
+
+.tarjeta h4 {
+  margin: 0 0 0.6rem;
+  color: var(--azul-oscuro);
+}
+
+#seccion-cambio-lider-red {
+  background-color: var(--blanco);
+  border: 1px solid #dbe3f0;
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+  margin-top: 1.25rem;
+}
+
+#seccion-cambio-lider-red h4 {
+  margin: 0 0 0.25rem;
+  color: var(--azul-oscuro);
+}
+
+#seccion-cambio-lider-red label {
+  display: block;
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-bottom: 0.3rem;
+  margin-top: 0.9rem;
+}
+
+#seccion-cambio-lider-red select {
+  width: 100%;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid #c6d0e2;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  font-family: inherit;
+  color: var(--texto);
+  background-color: var(--blanco);
 }
 
 .rol-etapa {

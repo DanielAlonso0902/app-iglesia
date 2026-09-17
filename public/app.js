@@ -51,6 +51,11 @@ const campoGrupoUsuario = document.querySelector('#campo-grupo-usuario');
 const selectUsuarioGrupo = document.querySelector('#usuario-grupo');
 const listaUsuarios = document.querySelector('#lista-usuarios');
 
+const seccionCambioLiderRed = document.querySelector('#seccion-cambio-lider-red');
+const formularioCambioLiderRed = document.querySelector('#formulario-cambio-lider-red');
+const selectCambioRed = document.querySelector('#cambio-red');
+const selectCambioLiderPersona = document.querySelector('#cambio-lider-persona');
+
 const loginSection = document.querySelector('#login-section');
 const areaApp = document.querySelector('#area-app');
 const formularioLogin = document.querySelector('#formulario-login');
@@ -120,6 +125,19 @@ async function cargarRedes() {
   const respuesta = await fetch('/api/redes');
   const redes = await respuesta.json();
 
+  selectCambioRed.innerHTML = redes.map((red) => '<option value="' + red.id + '">' + red.nombre + '</option>').join('');
+
+  if (usuarioActual && (usuarioActual.rol === 'Administrador' || usuarioActual.rol === 'Pastor')) {
+    const respuestaPersonas = await fetch('/api/personas');
+    const personas = await respuestaPersonas.json();
+    selectCambioLiderPersona.innerHTML = personas
+      .map((persona) => '<option value="' + persona.id + '">' + persona.nombre_completo + '</option>')
+      .join('');
+    seccionCambioLiderRed.classList.remove('oculto');
+  } else {
+    seccionCambioLiderRed.classList.add('oculto');
+  }
+
   redes.forEach((red) => {
     const tarjeta = document.createElement('article');
     tarjeta.className = 'tarjeta';
@@ -168,6 +186,7 @@ async function verGruposDeRed() {
   contenedorRedes.classList.add('oculto');
   contenedorDetalle.classList.remove('oculto');
   botonVolver.classList.remove('oculto');
+  seccionCambioLiderRed.classList.add('oculto');
 }
 
 async function verIntegrantesDeGrupo() {
@@ -214,8 +233,38 @@ async function verIntegrantesDeGrupo() {
       pedirExpediente(persona.id, persona.nombre_completo);
     });
 
+    if (puedeGestionar) {
+      const botonRetirar = document.createElement('button');
+      botonRetirar.className = 'btn btn-borde-rojo btn-mini';
+      botonRetirar.textContent = 'Retirar';
+      botonRetirar.addEventListener('click', (evento) => {
+        evento.stopPropagation();
+        retirarIntegrante(persona.id, persona.nombre_completo);
+      });
+      fila.appendChild(botonRetirar);
+    }
+
     contenedorDetalle.appendChild(fila);
   });
+
+  const puedeTransferirGrupo = usuarioActual && (usuarioActual.rol === 'Administrador' || usuarioActual.rol === 'Pastor' || usuarioActual.rol === 'Líder de Red');
+  if (puedeTransferirGrupo && integrantes.length > 0) {
+    const bloque = document.createElement('article');
+    bloque.className = 'tarjeta';
+    bloque.innerHTML =
+      '<h4>Transferir liderazgo del grupo</h4>' +
+      '<select id="select-nuevo-lider">' +
+        integrantes.map((presona) => '<option value="' + presona.id + '">' + presona.nombre_completo + '</option>').join('') +
+      '</select>' +
+      '<button class="btn btn-secundario">Transferir</button>';
+
+    bloque.querySelector('button').addEventListener('click', () => {
+      const nuevoLider = bloque.querySelector('select').value;
+      transferirLiderGrupo(nuevoLider);
+    });
+
+    contenedorDetalle.appendChild(bloque);
+  }
 
   const respuestaReuniones = await fetch('/api/grupos/' + grupoActual.id + '/reuniones');
   const reuniones = respuestaReuniones.ok ? await respuestaReuniones.json() : [];
@@ -264,6 +313,56 @@ function abrirFormulario() {
 function cerrarFormulario() {
   formularioSection.classList.add('oculto');
   botonAgregar.classList.remove('oculto');
+}
+
+async function retirarIntegrante(personaId, nombre) {
+  if (!window.confirm('¿Retirar a ' + nombre + ' del grupo?')) {
+    return;
+  }
+
+  const respuesta = await fetch('/api/grupos/' + grupoActual.id + '/integrantes/' + personaId + '/retirar', { method: 'POST' });
+  const resultado = await respuesta.json();
+
+  if (!respuesta.ok) {
+    window.alert(resultado.error || 'No se pudo retirar.');
+    return;
+  }
+
+  verIntegrantesDeGrupo();
+}
+
+async function transferirLiderGrupo(personaId) {
+  const respuesta = await fetch('/api/grupos/' + grupoActual.id + '/transferir-lider', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ persona_id: personaId })
+  });
+  const resultado = await respuesta.json();
+
+  if (!respuesta.ok) {
+    window.alert(resultado.error || 'No se pudo transferir.');
+    return;
+  }
+
+  verIntegrantesDeGrupo();
+}
+
+async function transferirLiderRed(evento) {
+  evento.preventDefault();
+
+  const respuesta = await fetch('/api/redes/' + selectCambioRed.value + '/transferir-lider', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ persona_id: selectCambioLiderPersona.value })
+  });
+  const resultado = await respuesta.json();
+
+  if (!respuesta.ok) {
+    window.alert(resultado.error || 'No se pudo transferir.');
+    return;
+  }
+
+  cargarRedes();
 }
 
 function renderizarReuniones(reuniones, puedeGestionar) {
@@ -1147,5 +1246,6 @@ formularioNuevaRed.addEventListener('submit', crearRed);
 formularioNuevoGrupo.addEventListener('submit', crearGrupo);
 formularioUsuario.addEventListener('submit', crearUsuario);
 selectUsuarioRol.addEventListener('change', actualizarCamposUsuario);
+formularioCambioLiderRed.addEventListener('submit', transferirLiderRed);
 
 iniciar();
