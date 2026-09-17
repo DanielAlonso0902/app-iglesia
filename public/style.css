@@ -480,6 +480,71 @@ footer {
   border-color: var(--azul-rey);
 }
 
+.buscar-existente {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.buscar-existente input {
+  flex: 1;
+  margin-right: 0;
+}
+
+.buscar-existente .btn {
+  margin-top: 0;
+  white-space: nowrap;
+}
+
+#resultados-persona {
+  margin-top: 0.65rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+#resultados-persona .tarjeta-persona {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.75rem;
+  background-color: var(--blanco);
+  border: 1px solid #dbe3f0;
+  border-radius: 0.5rem;
+}
+
+#resultados-persona .tarjeta-persona .info {
+  gap: 0.15rem;
+}
+
+#resultados-persona .tarjeta-persona .info span {
+  font-size: 0.8rem;
+  color: var(--texto-suave, #5b6b83);
+}
+
+#resultados-persona .tarjeta-persona .btn {
+  margin-top: 0;
+}
+
+.divisor {
+  text-align: center;
+  color: var(--texto-suave, #5b6b83);
+  font-size: 0.8rem;
+  margin: 1rem 0 0.25rem;
+}
+
+.sugerencia {
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  background-color: #fff8e1;
+  border: 1px solid #f0d489;
+  border-radius: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.sugerencia .btn {
+  margin-top: 0.6rem;
+}
+
 .botones {
   display: flex;
   gap: 0.75rem;

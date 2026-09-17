@@ -70,6 +70,15 @@
 
       <section id="formulario-section" class="oculto">
         <h3>Agregar integrante</h3>
+
+        <div class="buscar-existente">
+          <input type="search" id="buscar-persona" placeholder="¿Ya existe? Busca por cédula o nombre…">
+          <button type="button" id="boton-buscar-persona" class="btn btn-secundario">Buscar</button>
+        </div>
+        <section id="resultados-persona" class="oculto"></section>
+        <p id="mensaje-buscar-persona" class="alerta oculto"></p>
+        <p class="divisor">— o registra una persona nueva —</p>
+
         <form id="formulario-integrante">
           <label for="nombre">Nombre completo</label>
           <input type="text" id="nombre" name="nombre" required>
@@ -91,6 +100,7 @@
             <option>Anfitrión</option>
           </select>
 
+          <div id="sugerencia-duplicado" class="sugerencia oculto"></div>
           <p id="mensaje-error" class="alerta oculto"></p>
 
           <div class="botones">

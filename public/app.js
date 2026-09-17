@@ -8,6 +8,11 @@ const formularioSection = document.querySelector('#formulario-section');
 const formulario = document.querySelector('#formulario-integrante');
 const botonCancelar = document.querySelector('#cancelar-formulario');
 const mensajeError = document.querySelector('#mensaje-error');
+const campoBuscarPersona = document.querySelector('#buscar-persona');
+const botonBuscarPersona = document.querySelector('#boton-buscar-persona');
+const resultadosBuscarPersona = document.querySelector('#resultados-persona');
+const mensajeBuscarPersona = document.querySelector('#mensaje-buscar-persona');
+const sugerenciaDuplicado = document.querySelector('#sugerencia-duplicado');
 
 const botonAgregarReunion = document.querySelector('#boton-agregar-reunion');
 const formularioReunionSection = document.querySelector('#formulario-reunion-section');
@@ -289,6 +294,8 @@ async function verIntegrantesDeGrupo() {
 async function crearIntegrante(evento) {
   evento.preventDefault();
   mensajeError.classList.add('oculto');
+  sugerenciaDuplicado.classList.add('oculto');
+  sugerenciaDuplicado.innerHTML = '';
 
   const datos = {
     nombre: formulario.nombre.value,
@@ -306,6 +313,20 @@ async function crearIntegrante(evento) {
 
   const resultado = await respuesta.json();
 
+  if (respuesta.status === 409 && resultado.persona) {
+    const persona = resultado.persona;
+    formulario.cedula.value = persona.cedula || '';
+    sugerenciaDuplicado.innerHTML =
+      'Ya existe: <strong>' + persona.nombre_completo + '</strong>' +
+      (persona.cedula ? ' \\u00b7 Cédula ' + persona.cedula : '') +
+      '<br><button type="button" class="btn btn-primario">Es esta persona, agregarla al grupo</button>';
+    sugerenciaDuplicado.querySelector('button').addEventListener('click', () => {
+      agregarPersonaExistente(persona.id);
+    });
+    sugerenciaDuplicado.classList.remove('oculto');
+    return;
+  }
+
   if (!respuesta.ok) {
     mensajeError.textContent = resultado.error;
     mensajeError.classList.remove('oculto');
@@ -320,12 +341,99 @@ async function crearIntegrante(evento) {
 function abrirFormulario() {
   botonAgregar.classList.add('oculto');
   formularioSection.classList.remove('oculto');
+  ocultarBusquedaExistente();
   formulario.nombre.focus();
 }
 
 function cerrarFormulario() {
   formularioSection.classList.add('oculto');
   botonAgregar.classList.remove('oculto');
+  ocultarBusquedaExistente();
+}
+
+async function buscarPersonaParaGrupo() {
+  const q = campoBuscarPersona.value.trim();
+
+  if (!q) {
+    mensajeBuscarPersona.textContent = 'Escribe una cédula o un nombre para buscar.';
+    mensajeBuscarPersona.classList.remove('oculto');
+    resultadosBuscarPersona.classList.add('oculto');
+    resultadosBuscarPersona.innerHTML = '';
+    return;
+  }
+
+  mensajeBuscarPersona.classList.add('oculto');
+  resultadosBuscarPersona.innerHTML = '';
+
+  const respuesta = await fetch('/api/personas?q=' + encodeURIComponent(q));
+  const personas = await respuesta.json();
+
+  if (!respuesta.ok) {
+    mensajeBuscarPersona.textContent = personas.error || 'No se pudo buscar.';
+    mensajeBuscarPersona.classList.remove('oculto');
+    return;
+  }
+
+  if (personas.length === 0) {
+    mensajeBuscarPersona.textContent = 'No se encontró a nadie con "' + q + '". Puedes registrarla abajo.';
+    mensajeBuscarPersona.classList.remove('oculto');
+    return;
+  }
+
+  personas.forEach((persona) => {
+    const tarjeta = document.createElement('article');
+    tarjeta.className = 'tarjeta-persona';
+
+    const info = document.createElement('div');
+    info.className = 'info';
+    info.innerHTML =
+      '<strong>' + persona.nombre_completo + (persona.persona_activo ? '' : ' (inactivo)') + '</strong>' +
+      '<span>' + (persona.cedula ? 'Cédula ' + persona.cedula + ' · ' : '') + (persona.celular || 'sin celular') + '</span>';
+
+    const botonAgregarExistente = document.createElement('button');
+    botonAgregarExistente.className = 'btn btn-secundario';
+    botonAgregarExistente.textContent = 'Agregar';
+    botonAgregarExistente.addEventListener('click', () => {
+      agregarPersonaExistente(persona.id);
+    });
+
+    tarjeta.appendChild(info);
+    tarjeta.appendChild(botonAgregarExistente);
+    resultadosBuscarPersona.appendChild(tarjeta);
+  });
+
+  resultadosBuscarPersona.classList.remove('oculto');
+}
+
+async function agregarPersonaExistente(personaId) {
+  const rol = formulario.rol.value;
+
+  const respuesta = await fetch('/api/grupos/' + grupoActual.id + '/integrantes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ persona_id: personaId, rol })
+  });
+
+  const resultado = await respuesta.json();
+
+  if (!respuesta.ok) {
+    mensajeBuscarPersona.textContent = resultado.error || 'No se pudo agregar.';
+    mensajeBuscarPersona.classList.remove('oculto');
+    return;
+  }
+
+  formulario.reset();
+  cerrarFormulario();
+  verIntegrantesDeGrupo();
+}
+
+function ocultarBusquedaExistente() {
+  campoBuscarPersona.value = '';
+  resultadosBuscarPersona.innerHTML = '';
+  resultadosBuscarPersona.classList.add('oculto');
+  mensajeBuscarPersona.classList.add('oculto');
+  sugerenciaDuplicado.classList.add('oculto');
+  sugerenciaDuplicado.innerHTML = '';
 }
 
 async function retirarIntegrante(personaId, nombre) {
@@ -1381,6 +1489,13 @@ botonCerrarSesion.addEventListener('click', async () => {
 
 botonVolver.addEventListener('click', volver);
 botonAgregar.addEventListener('click', abrirFormulario);
+botonBuscarPersona.addEventListener('click', buscarPersonaParaGrupo);
+campoBuscarPersona.addEventListener('keydown', (evento) => {
+  if (evento.key === 'Enter') {
+    evento.preventDefault();
+    buscarPersonaParaGrupo();
+  }
+});
 botonCancelar.addEventListener('click', cerrarFormulario);
 formulario.addEventListener('submit', crearIntegrante);
 

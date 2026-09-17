@@ -788,13 +788,13 @@ app.get('/api/personas', requiereSesion, (req, res) => {
 
   const busqueda = '%' + q + '%';
   const personas = db.prepare(`
-    SELECT p.id, p.nombre_completo, p.celular, p.activo AS persona_activo, u.cedula
+    SELECT p.id, p.nombre_completo, p.celular, p.activo AS persona_activo, COALESCE(p.cedula, u.cedula) AS cedula
     FROM personas p
     LEFT JOIN usuarios u ON u.persona_id = p.id
-    WHERE p.nombre_completo LIKE ? OR p.celular LIKE ? OR u.cedula LIKE ?
+    WHERE p.nombre_completo LIKE ? OR p.celular LIKE ? OR p.cedula LIKE ? OR u.cedula LIKE ?
     ORDER BY p.nombre_completo
     LIMIT 50
-  `).all(busqueda, busqueda, busqueda);
+  `).all(busqueda, busqueda, busqueda, busqueda);
 
   for (const persona of personas) {
     persona.grupos = db.prepare(`
@@ -1037,14 +1037,10 @@ app.post('/api/grupos/:id/integrantes', requiereSesion, requiereRol(['Administra
     }
   }
 
-  const nombre = req.body.nombre;
-  const cedula = req.body.cedula || null;
-  const celular = req.body.celular || null;
-  const direccion = req.body.direccion || null;
   const rol = req.body.rol;
 
-  if (!nombre || !rol) {
-    res.status(400).json({ error: 'El nombre y el rol son obligatorios.' });
+  if (!rol) {
+    res.status(400).json({ error: 'El rol es obligatorio.' });
     return;
   }
 
@@ -1053,17 +1049,71 @@ app.post('/api/grupos/:id/integrantes', requiereSesion, requiereRol(['Administra
     return;
   }
 
-  const insertarPersona = db.prepare(
-    'INSERT INTO personas (nombre_completo, cedula, celular, direccion) VALUES (?, ?, ?, ?)'
-  );
+  const hoy = new Date().toISOString().slice(0, 10);
   const insertarPertenencia = db.prepare(
     'INSERT INTO persona_grupo (persona_id, grupo_id, rol, fecha_inicio, activo) VALUES (?, ?, ?, ?, 1)'
+  );
+
+  const personaIdExistente = Number(req.body.persona_id);
+  if (personaIdExistente) {
+    const persona = db.prepare('SELECT id, nombre_completo FROM personas WHERE id = ? AND activo = 1').get(personaIdExistente);
+
+    if (!persona) {
+      res.status(404).json({ error: 'La persona no existe.' });
+      return;
+    }
+
+    const yaIntegrante = db.prepare('SELECT id FROM persona_grupo WHERE persona_id = ? AND grupo_id = ? AND activo = 1').get(personaIdExistente, grupoId);
+
+    if (yaIntegrante) {
+      res.status(409).json({ error: 'Esta persona ya es integrante de este grupo.' });
+      return;
+    }
+
+    insertarPertenencia.run(personaIdExistente, grupoId, rol, hoy);
+    res.status(201).json({ id: personaIdExistente, nombre: persona.nombre_completo, rol });
+    return;
+  }
+
+  const nombre = req.body.nombre;
+  const cedula = req.body.cedula || null;
+  const celular = req.body.celular || null;
+  const direccion = req.body.direccion || null;
+
+  if (!nombre) {
+    res.status(400).json({ error: 'El nombre es obligatorio.' });
+    return;
+  }
+
+  const existePorCedula = cedula ? db.prepare(`
+    SELECT p.id, p.nombre_completo, p.cedula AS persona_cedula, u.cedula AS usuario_cedula
+    FROM personas p
+    LEFT JOIN usuarios u ON u.persona_id = p.id
+    WHERE p.activo = 1 AND (p.cedula = ? OR u.cedula = ?)
+  `).get(cedula, cedula) : null;
+
+  if (existePorCedula) {
+    const yaIntegrante = db.prepare('SELECT id FROM persona_grupo WHERE persona_id = ? AND grupo_id = ? AND activo = 1').get(existePorCedula.id, grupoId);
+
+    if (yaIntegrante) {
+      res.status(409).json({ error: 'Ya existe una persona con esa cédula y ya es integrante de este grupo.' });
+      return;
+    }
+
+    res.status(409).json({
+      error: 'Ya existe una persona con esa cédula: ' + existePorCedula.nombre_completo + '.',
+      persona: { id: existePorCedula.id, nombre_completo: existePorCedula.nombre_completo, cedula: existePorCedula.persona_cedula || existePorCedula.usuario_cedula }
+    });
+    return;
+  }
+
+  const insertarPersona = db.prepare(
+    'INSERT INTO personas (nombre_completo, cedula, celular, direccion) VALUES (?, ?, ?, ?)'
   );
 
   const crearIntegrante = db.transaction(() => {
     const resultado = insertarPersona.run(nombre, cedula, celular, direccion);
     const personaId = Number(resultado.lastInsertRowid);
-    const hoy = new Date().toISOString().slice(0, 10);
     insertarPertenencia.run(personaId, grupoId, rol, hoy);
     return personaId;
   });
