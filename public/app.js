@@ -1376,7 +1376,10 @@ function actualizarCamposUsuario() {
   const rol = selectUsuarioRol.value;
   campoRedUsuario.classList.toggle('oculto', rol !== 'Líder de Red');
   campoGrupoUsuario.classList.toggle('oculto', rol !== 'Líder de Grupo');
-  campoPersonaNueva.classList.toggle('oculto', selectUsuarioPersona.value !== '');
+  const esPersonaNueva = selectUsuarioPersona.value === '';
+  campoPersonaNueva.classList.toggle('oculto', !esPersonaNueva);
+  selectUsuarioPersona.required = !esPersonaNueva;
+  formularioUsuario.nombre_persona.required = esPersonaNueva;
 }
 
 async function crearUsuario(evento) {
