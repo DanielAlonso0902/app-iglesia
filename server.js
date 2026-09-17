@@ -27,7 +27,7 @@ function requiereSesion(req, res, next) {
   }
 
   const sesion = db.prepare(`
-    SELECT sesiones.token, usuarios.id, usuarios.cedula, usuarios.rol, usuarios.activo AS usuario_activo
+    SELECT sesiones.token, usuarios.id, usuarios.cedula, usuarios.rol, usuarios.persona_id, usuarios.activo AS usuario_activo
     FROM sesiones
     JOIN usuarios ON usuarios.id = sesiones.usuario_id
     WHERE sesiones.token = ?
@@ -40,6 +40,35 @@ function requiereSesion(req, res, next) {
 
   req.usuario = sesion;
   next();
+}
+
+function requiereRol(rolesPermitidos) {
+  return function (req, res, next) {
+    if (!rolesPermitidos.includes(req.usuario.rol)) {
+      res.status(403).json({ error: 'No tienes permiso para esta acción.' });
+      return;
+    }
+    next();
+  };
+}
+
+function puedeVerGrupo(grupoId, usuario) {
+  if (usuario.rol === 'Administrador' || usuario.rol === 'Pastor') {
+    return true;
+  }
+
+  if (usuario.rol === 'Líder de Grupo') {
+    if (!usuario.persona_id) return false;
+
+    const pertenencia = db.prepare(`
+      SELECT id FROM persona_grupo
+      WHERE persona_id = ? AND grupo_id = ? AND rol = 'Líder' AND activo = 1
+    `).get(usuario.persona_id, grupoId);
+
+    return !!pertenencia;
+  }
+
+  return true;
 }
 
 app.post('/api/login', (req, res) => {
@@ -78,12 +107,12 @@ app.post('/api/logout', (req, res) => {
   res.json({ mensaje: 'Sesión cerrada.' });
 });
 
-app.get('/api/redes', (req, res) => {
+app.get('/api/redes', requiereSesion, (req, res) => {
   const redes = db.prepare('SELECT * FROM redes ORDER BY nombre').all();
   res.json(redes);
 });
 
-app.get('/api/grupos', (req, res) => {
+app.get('/api/grupos', requiereSesion, (req, res) => {
   const grupos = db.prepare(`
     SELECT grupos.*, redes.nombre AS red
     FROM grupos
@@ -93,7 +122,7 @@ app.get('/api/grupos', (req, res) => {
   res.json(grupos);
 });
 
-app.get('/api/redes/:id/grupos', (req, res) => {
+app.get('/api/redes/:id/grupos', requiereSesion, (req, res) => {
   const redId = Number(req.params.id);
 
   const grupos = db.prepare(`
@@ -107,8 +136,13 @@ app.get('/api/redes/:id/grupos', (req, res) => {
   res.json(grupos);
 });
 
-app.get('/api/grupos/:id/integrantes', (req, res) => {
+app.get('/api/grupos/:id/integrantes', requiereSesion, (req, res) => {
   const grupoId = Number(req.params.id);
+
+  if (!puedeVerGrupo(grupoId, req.usuario)) {
+    res.status(403).json({ error: 'No puedes consultar este grupo.' });
+    return;
+  }
 
   const integrantes = db.prepare(`
     SELECT personas.id, personas.nombre_completo, personas.celular, persona_grupo.rol
@@ -136,8 +170,16 @@ app.get('/api/personas', (req, res) => {
 
 const rolesValidos = ['Líder', 'Apoyo', 'Anfitrión', 'Integrante'];
 
-app.post('/api/grupos/:id/integrantes', (req, res) => {
+app.post('/api/grupos/:id/integrantes', requiereSesion, requiereRol(['Administrador', 'Líder de Grupo']), (req, res) => {
   const grupoId = Number(req.params.id);
+
+  if (req.usuario.rol !== 'Administrador') {
+    if (!puedeVerGrupo(grupoId, req.usuario)) {
+      res.status(403).json({ error: 'Solo puedes registrar integrantes en tus propios grupos.' });
+      return;
+    }
+  }
+
   const nombre = req.body.nombre;
   const celular = req.body.celular || null;
   const rol = req.body.rol;

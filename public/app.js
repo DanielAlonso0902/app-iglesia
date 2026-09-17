@@ -20,6 +20,7 @@ const botonCerrarSesion = document.querySelector('#boton-cerrar-sesion');
 let pantalla = 'redes';
 let redActual = null;
 let grupoActual = null;
+let usuarioActual = null;
 
 async function iniciar() {
   const respuesta = await fetch('/api/me');
@@ -39,6 +40,7 @@ function mostrarLogin() {
 }
 
 function mostrarApp(usuario) {
+  usuarioActual = usuario;
   loginSection.classList.add('oculto');
   areaApp.classList.remove('oculto');
   usuarioBarra.classList.remove('oculto');
@@ -102,12 +104,30 @@ async function verGruposDeRed() {
 
 async function verIntegrantesDeGrupo() {
   const respuesta = await fetch('/api/grupos/' + grupoActual.id + '/integrantes');
-  const integrantes = await respuesta.json();
+  const resultado = await respuesta.json();
 
   tituloPagina.textContent = grupoActual.nombre;
   contenedorDetalle.innerHTML = '';
+
+  if (!respuesta.ok) {
+    pantalla = 'integrantes';
+    contenedorDetalle.innerHTML = '<p class="vacio">' + (resultado.error || 'No tienes permiso.') + '</p>';
+    contenedorRedes.classList.add('oculto');
+    contenedorDetalle.classList.remove('oculto');
+    botonVolver.classList.remove('oculto');
+    botonAgregar.classList.add('oculto');
+    return;
+  }
+
+  const integrantes = resultado;
   pantalla = 'integrantes';
-  botonAgregar.classList.remove('oculto');
+
+  const puedeAgregar = usuarioActual && (usuarioActual.rol === 'Administrador' || usuarioActual.rol === 'Líder de Grupo');
+  if (puedeAgregar) {
+    botonAgregar.classList.remove('oculto');
+  } else {
+    botonAgregar.classList.add('oculto');
+  }
 
   if (integrantes.length === 0) {
     contenedorDetalle.innerHTML = '<p class="vacio">Este grupo aún no tiene integrantes.</p>';
