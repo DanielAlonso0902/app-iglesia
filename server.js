@@ -357,9 +357,16 @@ app.patch('/api/redes/:id/estado', requiereSesion, requiereRol(['Administrador',
 app.post('/api/grupos', requiereSesion, requiereRol(['Administrador', 'Pastor']), (req, res) => {
   const redId = Number(req.body.red_id);
   const nombre = req.body.nombre;
+  const diasValidos = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+  const diaHabitual = req.body.dia_habitual || null;
 
   if (!redId || !nombre) {
     res.status(400).json({ error: 'La red y el nombre del grupo son obligatorios.' });
+    return;
+  }
+
+  if (diaHabitual && !diasValidos.includes(diaHabitual)) {
+    res.status(400).json({ error: 'El día habitual debe ser uno de la lista.' });
     return;
   }
 
@@ -376,7 +383,7 @@ app.post('/api/grupos', requiereSesion, requiereRol(['Administrador', 'Pastor'])
   `).run(
     redId,
     nombre,
-    req.body.dia_habitual || null,
+    diaHabitual,
     req.body.hora_habitual || null,
     req.body.duracion_habitual || null,
     req.body.direccion || null,

@@ -200,7 +200,16 @@
           <label for="grupo-nombre">Nombre</label>
           <input type="text" id="grupo-nombre" name="nombre" placeholder="Ej. Grupo #300" required>
           <label for="grupo-dia">Día habitual</label>
-          <input type="text" id="grupo-dia" name="dia_habitual" placeholder="Ej. Sábado">
+          <select id="grupo-dia" name="dia_habitual" required>
+            <option value="" disabled selected>Elegir día…</option>
+            <option>Lunes</option>
+            <option>Martes</option>
+            <option>Miércoles</option>
+            <option>Jueves</option>
+            <option>Viernes</option>
+            <option>Sábado</option>
+            <option>Domingo</option>
+          </select>
           <label for="grupo-hora">Hora habitual</label>
           <input type="text" id="grupo-hora" name="hora_habitual" placeholder="Ej. 5:30 PM">
           <label for="grupo-direccion">Dirección</label>
