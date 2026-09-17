@@ -105,3 +105,19 @@ CREATE TABLE IF NOT EXISTS visitantes (
   observacion TEXT,
   FOREIGN KEY (reunion_id) REFERENCES reuniones(id)
 );
+
+CREATE TABLE IF NOT EXISTS proceso_formacion (
+  id INTEGER PRIMARY KEY,
+  persona_id INTEGER NOT NULL,
+  etapa TEXT NOT NULL CHECK (etapa IN ('Discípulo S1', 'Discípulo S2', 'Discípulo S3', 'Discípulo S4', 'Bendición N1', 'Bendición N2', 'Bendición N3', 'Ministerio de la Misericordia')),
+  promedio REAL,
+  fecha_inicio TEXT,
+  fecha_fin TEXT,
+  activo INTEGER NOT NULL DEFAULT 1,
+  UNIQUE (persona_id, etapa),
+  FOREIGN KEY (persona_id) REFERENCES personas(id)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS unico_activo_formacion
+  ON proceso_formacion (persona_id)
+  WHERE activo = 1;

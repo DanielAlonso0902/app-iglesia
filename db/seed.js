@@ -21,6 +21,9 @@ const insertarPersonaGrupo = db.prepare(
 const insertarPersonaRed = db.prepare(
   'INSERT INTO persona_red (persona_id, red_id, fecha_inicio, activo) VALUES (?, ?, ?, 1)'
 );
+const insertarFormacion = db.prepare(
+  'INSERT INTO proceso_formacion (persona_id, etapa, promedio, fecha_inicio, fecha_fin, activo) VALUES (?, ?, ?, ?, ?, ?)'
+);
 const insertarUsuario = db.prepare(
   'INSERT INTO usuarios (cedula, password_hash, rol, persona_id, activo) VALUES (?, ?, ?, ?, 1)'
 );
@@ -52,6 +55,11 @@ insertarPersonaGrupo.run(ana, grupo100, 'Apoyo', '2026-02-10', null, 1);
 
 insertarPersonaRed.run(maria, redJovenes, '2026-01-10');
 
+insertarFormacion.run(carlos, 'Discípulo S4', 4.5, '2025-08-01', null, 1);
+insertarFormacion.run(ana, 'Discípulo S2', null, '2026-03-01', null, 1);
+insertarFormacion.run(maria, 'Bendición N3', 4.8, '2025-01-15', '2025-12-10', 0);
+insertarFormacion.run(maria, 'Ministerio de la Misericordia', null, '2026-01-15', null, 1);
+
 insertarUsuario.run('1000000001', bcrypt.hashSync('admin123', 10), 'Administrador', null);
 insertarUsuario.run('1023456789', bcrypt.hashSync('carlos123', 10), 'Líder de Grupo', carlos);
 insertarUsuario.run('1034567890', bcrypt.hashSync('maria123', 10), 'Líder de Red', maria);
@@ -68,6 +76,17 @@ const consultaHistorial = db.prepare(`
 console.log('\nHistorial de participacion (persona | grupo | rol | inicio | fin | activo):');
 consultaHistorial.all().forEach((fila) =>
   console.log(fila.nombre_completo + ' | ' + fila.grupo + ' | ' + fila.rol + ' | ' + fila.fecha_inicio + ' | ' + fila.fecha_fin + ' | ' + fila.activo)
+);
+
+const consultaFormacion = db.prepare(`
+  SELECT personas.nombre_completo, proceso_formacion.etapa, proceso_formacion.promedio, proceso_formacion.activo
+  FROM proceso_formacion
+  JOIN personas ON personas.id = proceso_formacion.persona_id
+  ORDER BY personas.nombre_completo, proceso_formacion.etapa
+`);
+console.log('\nFormacion (persona | etapa | promedio | activo):');
+consultaFormacion.all().forEach((fila) =>
+  console.log(fila.nombre_completo + ' | ' + fila.etapa + ' | ' + fila.promedio + ' | ' + fila.activo)
 );
 
 db.close();
