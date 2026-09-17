@@ -15,6 +15,35 @@
   <main>
     <button id="boton-volver" class="oculto">← Volver</button>
     <h2 id="titulo-pagina">Nuestras Redes</h2>
+
+    <section id="formulario-section" class="oculto">
+      <h3>Agregar integrante</h3>
+      <form id="formulario-integrante">
+        <label for="nombre">Nombre completo</label>
+        <input type="text" id="nombre" name="nombre" required>
+
+        <label for="celular">Celular</label>
+        <input type="text" id="celular" name="celular">
+
+        <label for="rol">Rol</label>
+        <select id="rol" name="rol">
+          <option>Integrante</option>
+          <option>Líder</option>
+          <option>Apoyo</option>
+          <option>Anfitrión</option>
+        </select>
+
+        <p id="mensaje-error" class="alerta oculto"></p>
+
+        <div class="botones">
+          <button type="submit" class="btn btn-primario">Guardar</button>
+          <button type="button" id="cancelar-formulario" class="btn">Cancelar</button>
+        </div>
+      </form>
+    </section>
+
+    <button id="boton-agregar" class="btn btn-primario oculto">+ Agregar integrante</button>
+
     <section id="lista-redes"></section>
     <section id="detalle" class="oculto"></section>
   </main>

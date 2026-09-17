@@ -1,7 +1,13 @@
 const contenedorRedes = document.querySelector('#lista-redes');
 const contenedorDetalle = document.querySelector('#detalle');
 const botonVolver = document.querySelector('#boton-volver');
+const botonAgregar = document.querySelector('#boton-agregar');
 const tituloPagina = document.querySelector('#titulo-pagina');
+
+const formularioSection = document.querySelector('#formulario-section');
+const formulario = document.querySelector('#formulario-integrante');
+const botonCancelar = document.querySelector('#cancelar-formulario');
+const mensajeError = document.querySelector('#mensaje-error');
 
 let pantalla = 'redes';
 let redActual = null;
@@ -32,6 +38,8 @@ async function verGruposDeRed() {
   tituloPagina.textContent = 'Grupos de ' + redActual.nombre;
   contenedorDetalle.innerHTML = '';
   pantalla = 'grupos';
+  botonAgregar.classList.add('oculto');
+  formularioSection.classList.add('oculto');
 
   if (grupos.length === 0) {
     contenedorDetalle.innerHTML = '<p class="vacio">Esta red aún no tiene grupos.</p>';
@@ -65,6 +73,7 @@ async function verIntegrantesDeGrupo() {
   tituloPagina.textContent = grupoActual.nombre;
   contenedorDetalle.innerHTML = '';
   pantalla = 'integrantes';
+  botonAgregar.classList.remove('oculto');
 
   if (integrantes.length === 0) {
     contenedorDetalle.innerHTML = '<p class="vacio">Este grupo aún no tiene integrantes.</p>';
@@ -83,6 +92,46 @@ async function verIntegrantesDeGrupo() {
   contenedorRedes.classList.add('oculto');
   contenedorDetalle.classList.remove('oculto');
   botonVolver.classList.remove('oculto');
+}
+
+async function crearIntegrante(evento) {
+  evento.preventDefault();
+  mensajeError.classList.add('oculto');
+
+  const datos = {
+    nombre: formulario.nombre.value,
+    celular: formulario.celular.value,
+    rol: formulario.rol.value
+  };
+
+  const respuesta = await fetch('/api/grupos/' + grupoActual.id + '/integrantes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(datos)
+  });
+
+  const resultado = await respuesta.json();
+
+  if (!respuesta.ok) {
+    mensajeError.textContent = resultado.error;
+    mensajeError.classList.remove('oculto');
+    return;
+  }
+
+  formulario.reset();
+  cerrarFormulario();
+  verIntegrantesDeGrupo();
+}
+
+function abrirFormulario() {
+  botonAgregar.classList.add('oculto');
+  formularioSection.classList.remove('oculto');
+  formulario.nombre.focus();
+}
+
+function cerrarFormulario() {
+  formularioSection.classList.add('oculto');
+  botonAgregar.classList.remove('oculto');
 }
 
 function clasePorRol(rol) {
@@ -106,8 +155,13 @@ function mostrarRedes() {
   contenedorRedes.classList.remove('oculto');
   contenedorDetalle.classList.add('oculto');
   botonVolver.classList.add('oculto');
+  botonAgregar.classList.add('oculto');
+  formularioSection.classList.add('oculto');
 }
 
 botonVolver.addEventListener('click', volver);
+botonAgregar.addEventListener('click', abrirFormulario);
+botonCancelar.addEventListener('click', cerrarFormulario);
+formulario.addEventListener('submit', crearIntegrante);
 
 cargarRedes();
