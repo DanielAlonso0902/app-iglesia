@@ -359,6 +359,7 @@ app.post('/api/grupos', requiereSesion, requiereRol(['Administrador', 'Pastor'])
   const nombre = req.body.nombre;
   const diasValidos = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
   const diaHabitual = req.body.dia_habitual || null;
+  const horaHabitual = req.body.hora_habitual || null;
 
   if (!redId || !nombre) {
     res.status(400).json({ error: 'La red y el nombre del grupo son obligatorios.' });
@@ -367,6 +368,11 @@ app.post('/api/grupos', requiereSesion, requiereRol(['Administrador', 'Pastor'])
 
   if (diaHabitual && !diasValidos.includes(diaHabitual)) {
     res.status(400).json({ error: 'El día habitual debe ser uno de la lista.' });
+    return;
+  }
+
+  if (horaHabitual && !/^\d{1,2}:\d{2} (AM|PM)$/.test(horaHabitual)) {
+    res.status(400).json({ error: 'La hora habitual debe ser como 5:30 PM.' });
     return;
   }
 
@@ -384,7 +390,7 @@ app.post('/api/grupos', requiereSesion, requiereRol(['Administrador', 'Pastor'])
     redId,
     nombre,
     diaHabitual,
-    req.body.hora_habitual || null,
+    horaHabitual,
     req.body.duracion_habitual || null,
     req.body.direccion || null,
     req.body.barrio || null,

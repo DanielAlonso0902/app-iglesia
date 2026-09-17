@@ -1320,8 +1320,9 @@ async function crearGrupo(evento) {
     red_id: selectGrupoRed.value,
     nombre: formularioNuevoGrupo.nombre.value,
     dia_habitual: formularioNuevoGrupo.dia_habitual.value,
-    hora_habitual: formularioNuevoGrupo.hora_habitual.value,
+    hora_habitual: formularioNuevoGrupo.hora_habitual.value + ' ' + formularioNuevoGrupo.hora_habitual_periodo.value,
     direccion: formularioNuevoGrupo.direccion.value,
+    barrio: formularioNuevoGrupo.barrio.value,
     ciudad: formularioNuevoGrupo.ciudad.value
   };
 
@@ -1400,5 +1401,21 @@ formularioNuevoGrupo.addEventListener('submit', crearGrupo);
 formularioUsuario.addEventListener('submit', crearUsuario);
 selectUsuarioRol.addEventListener('change', actualizarCamposUsuario);
 formularioCambioLiderRed.addEventListener('submit', transferirLiderRed);
+
+const horas = [];
+for (let h = 7; h <= 12; h++) {
+  horas.push(h);
+}
+for (let h = 1; h <= 11; h++) {
+  horas.push(h);
+}
+horas.forEach((h) => {
+  ['00', '30'].forEach((minuto) => {
+    const opcion = document.createElement('option');
+    opcion.value = h + ':' + minuto;
+    opcion.textContent = h + ':' + minuto;
+    formularioNuevoGrupo.hora_habitual.appendChild(opcion);
+  });
+});
 
 iniciar();

@@ -211,9 +211,19 @@
             <option>Domingo</option>
           </select>
           <label for="grupo-hora">Hora habitual</label>
-          <input type="text" id="grupo-hora" name="hora_habitual" placeholder="Ej. 5:30 PM">
+          <div class="fila-hora">
+            <select id="grupo-hora" name="hora_habitual" required>
+              <option value="" disabled selected>Elegir hora…</option>
+            </select>
+            <select id="grupo-hora-periodo" name="hora_habitual_periodo">
+              <option>AM</option>
+              <option>PM</option>
+            </select>
+          </div>
           <label for="grupo-direccion">Dirección</label>
           <input type="text" id="grupo-direccion" name="direccion">
+          <label for="grupo-barrio">Barrio</label>
+          <input type="text" id="grupo-barrio" name="barrio">
           <label for="grupo-ciudad">Ciudad</label>
           <input type="text" id="grupo-ciudad" name="ciudad">
           <div class="botones"><button type="submit" class="btn btn-primario">Crear grupo</button></div>

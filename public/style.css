@@ -359,6 +359,19 @@ footer {
   border-color: var(--azul-rey);
 }
 
+#formulario-nuevo-grupo .fila-hora {
+  display: flex;
+  gap: 0.5rem;
+}
+
+#formulario-nuevo-grupo .fila-hora select {
+  flex: 1;
+}
+
+#formulario-nuevo-grupo .fila-hora select:first-child {
+  flex: 2;
+}
+
 .btn-borde-rojo {
   background-color: transparent;
   color: #b3261e;
