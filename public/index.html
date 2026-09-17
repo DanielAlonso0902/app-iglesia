@@ -67,6 +67,32 @@
 
       <button id="boton-agregar" class="btn btn-primario oculto">+ Agregar integrante</button>
 
+      <button id="boton-agregar-reunion" class="btn oculto">+ Registrar reunión</button>
+
+      <section id="formulario-reunion-section" class="oculto">
+        <h3>Registrar reunión</h3>
+        <form id="formulario-reunion">
+          <label for="fecha-reunion">Fecha</label>
+          <input type="date" id="fecha-reunion" name="fecha" required>
+
+          <label for="duracion-reunion">Duración</label>
+          <input type="text" id="duracion-reunion" name="duracion" placeholder="Ej. 1 hora 45 minutos">
+
+          <label for="observacion-reunion">Observación</label>
+          <textarea id="observacion-reunion" name="observacion" rows="2"></textarea>
+
+          <p id="mensaje-error-reunion" class="alerta oculto"></p>
+
+          <div class="botones">
+            <button type="submit" class="btn btn-primario">Guardar reunión</button>
+            <button type="button" id="cancelar-reunion" class="btn">Cancelar</button>
+          </div>
+        </form>
+      </section>
+
+      <h3 id="titulo-reuniones" class="oculto">Reuniones</h3>
+      <section id="lista-reuniones"></section>
+
       <section id="lista-redes"></section>
       <section id="detalle" class="oculto"></section>
     </div>

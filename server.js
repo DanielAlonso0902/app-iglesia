@@ -168,6 +168,58 @@ app.get('/api/personas', (req, res) => {
   res.json(personas);
 });
 
+app.get('/api/grupos/:id/reuniones', requiereSesion, (req, res) => {
+  const grupoId = Number(req.params.id);
+
+  if (!puedeVerGrupo(grupoId, req.usuario)) {
+    res.status(403).json({ error: 'No puedes consultar este grupo.' });
+    return;
+  }
+
+  const reuniones = db.prepare(`
+    SELECT * FROM reuniones
+    WHERE grupo_id = ?
+    ORDER BY fecha DESC
+  `).all(grupoId);
+
+  res.json(reuniones);
+});
+
+app.post('/api/grupos/:id/reuniones', requiereSesion, requiereRol(['Administrador', 'Líder de Grupo']), (req, res) => {
+  const grupoId = Number(req.params.id);
+
+  if (req.usuario.rol !== 'Administrador') {
+    if (!puedeVerGrupo(grupoId, req.usuario)) {
+      res.status(403).json({ error: 'Solo puedes registrar reuniones en tus propios grupos.' });
+      return;
+    }
+  }
+
+  const fecha = req.body.fecha;
+  const tipo = req.body.tipo || 'Grupo habitual';
+  const duracion = req.body.duracion || null;
+  const observacion = req.body.observacion || null;
+  const realizada = req.body.realizada === undefined ? 1 : (req.body.realizada ? 1 : 0);
+
+  if (!fecha) {
+    res.status(400).json({ error: 'La fecha es obligatoria.' });
+    return;
+  }
+
+  const tiposValidos = ['Grupo habitual', 'Servicio de red', 'Actividad especial', 'Reunión cancelada'];
+  if (!tiposValidos.includes(tipo)) {
+    res.status(400).json({ error: 'El tipo de reunión no es válido.' });
+    return;
+  }
+
+  const resultado = db.prepare(`
+    INSERT INTO reuniones (grupo_id, fecha, tipo, realizada, duracion, observacion)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(grupoId, fecha, tipo, realizada, duracion, observacion);
+
+  res.status(201).json({ id: Number(resultado.lastInsertRowid), fecha, tipo, realizada, duracion, observacion });
+});
+
 const rolesValidos = ['Líder', 'Apoyo', 'Anfitrión', 'Integrante'];
 
 app.post('/api/grupos/:id/integrantes', requiereSesion, requiereRol(['Administrador', 'Líder de Grupo']), (req, res) => {

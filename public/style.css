@@ -122,6 +122,12 @@ footer {
   color: #55606c;
 }
 
+.tarjeta-reunion {
+  cursor: default;
+  border-left-color: #2e8b57;
+  margin-bottom: 0.75rem;
+}
+
 .vacio {
   text-align: center;
   color: #6b7a8a;
