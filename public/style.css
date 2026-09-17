@@ -265,6 +265,82 @@ footer {
   background-color: var(--azul-oscuro);
 }
 
+.btn-secundario {
+  background-color: var(--blanco);
+  color: var(--azul-rey);
+  border-color: var(--azul-rey);
+  margin-top: 0.6rem;
+}
+
+.btn-secundario:hover {
+  background-color: var(--azul-rey);
+  color: var(--blanco);
+}
+
+.integrante-chequeo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background-color: var(--blanco);
+  border-radius: 0.75rem;
+  padding: 0.8rem 1rem;
+  box-shadow: 0 2px 6px rgba(34, 48, 62, 0.1);
+  margin-bottom: 0.75rem;
+  cursor: pointer;
+}
+
+.integrante-chequeo input[type="checkbox"] {
+  width: 1.15rem;
+  height: 1.15rem;
+  accent-color: var(--azul-rey);
+  flex-shrink: 0;
+}
+
+.exito {
+  background-color: #e7f6ec;
+  color: #1e7a3c;
+  border-color: #b8e3c8;
+}
+
+#formulario-visitante {
+  background-color: var(--blanco);
+  border: 1px solid #dbe3f0;
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+  margin-top: 1.25rem;
+}
+
+#formulario-visitante h4 {
+  margin: 0 0 0.25rem;
+  color: var(--azul-oscuro);
+}
+
+#formulario-visitante label {
+  display: block;
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-bottom: 0.3rem;
+  margin-top: 0.9rem;
+}
+
+#formulario-visitante input,
+#formulario-visitante textarea {
+  width: 100%;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid #c6d0e2;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  font-family: inherit;
+  color: var(--texto);
+  background-color: var(--blanco);
+}
+
+#formulario-visitante input:focus,
+#formulario-visitante textarea:focus {
+  outline: none;
+  border-color: var(--azul-rey);
+}
+
 #cancelar-formulario {
   background-color: transparent;
   color: #6b7a8a;

@@ -28,6 +28,7 @@ const botonCerrarSesion = document.querySelector('#boton-cerrar-sesion');
 let pantalla = 'redes';
 let redActual = null;
 let grupoActual = null;
+let reunionActual = null;
 let usuarioActual = null;
 
 async function iniciar() {
@@ -226,6 +227,18 @@ function renderizarReuniones(reuniones, puedeGestionar) {
       '<span>' + reunion.tipo + '</span>' +
       '<span>' + (reunion.realizada ? 'Realizada' : 'Cancelada') + ' · ' + (reunion.duracion || 'sin duración') + '</span>' +
       (reunion.observacion ? '<span class="direccion">' + reunion.observacion + '</span>' : '');
+
+    if (puedeGestionar) {
+      const botonAsistencia = document.createElement('button');
+      botonAsistencia.className = 'btn btn-secundario';
+      botonAsistencia.textContent = 'Asistencia';
+      botonAsistencia.addEventListener('click', () => {
+        reunionActual = { id: reunion.id };
+        verDetalleReunion();
+      });
+      tarjeta.appendChild(botonAsistencia);
+    }
+
     listaReuniones.appendChild(tarjeta);
   });
 }
@@ -277,6 +290,141 @@ function cerrarFormularioReunion() {
   botonAgregarReunion.classList.remove('oculto');
 }
 
+async function verDetalleReunion() {
+  const respuesta = await fetch('/api/reuniones/' + reunionActual.id);
+  const detalle = await respuesta.json();
+
+  if (!respuesta.ok) {
+    tituloPagina.textContent = 'Reunión';
+    contenedorDetalle.innerHTML = '<p class="vacio">' + (detalle.error || 'No tienes permiso.') + '</p>';
+    return;
+  }
+
+  pantalla = 'reunion';
+  tituloPagina.textContent = 'Reunión del ' + detalle.reunion.fecha + ' · ' + detalle.reunion.tipo;
+  botonAgregar.classList.add('oculto');
+  formularioSection.classList.add('oculto');
+  ocultarReuniones();
+
+  const puedeGestionar = usuarioActual && (usuarioActual.rol === 'Administrador' || usuarioActual.rol === 'Líder de Grupo');
+
+  let html = '<h3>Asistencia</h3><div id="asistencia-lista">';
+
+  if (detalle.integrantes.length === 0) {
+    html += '<p class="vacio">Este grupo aún no tiene integrantes.</p>';
+  }
+
+  detalle.integrantes.forEach((integrante) => {
+    const asistio = integrante.asistio === null || integrante.asistio === 1;
+    html +=
+      '<label class="integrante-chequeo">' +
+      '<input type="checkbox" data-persona-id="' + integrante.id + '"' + (asistio ? ' checked' : '') + '>' +
+      '<span class="info"><strong>' + integrante.nombre_completo + '</strong></span>' +
+      '<span class="rol rol-' + clasePorRol(integrante.rol) + '">' + integrante.rol + '</span>' +
+      '</label>';
+  });
+
+  html += '</div>';
+
+  if (puedeGestionar) {
+    html += '<button id="guardar-asistencia" class="btn btn-primario boton-ancho">Guardar asistencia</button>';
+  }
+
+  html += '<p id="mensaje-asistencia" class="alerta exito oculto"></p>';
+
+  html += '<h3>Visitantes</h3><section id="visitantes-lista">';
+
+  if (detalle.visitantes.length === 0) {
+    html += '<p class="vacio">No se registraron visitantes.</p>';
+  }
+
+  detalle.visitantes.forEach((visitante) => {
+    html +=
+      '<article class="tarjeta tarjeta-reunion">' +
+      '<strong>' + visitante.nombre + '</strong>' +
+      '<span>Teléfono: ' + (visitante.telefono || 'no registrado') + '</span>' +
+      (visitante.observacion ? '<span class="direccion">' + visitante.observacion + '</span>' : '') +
+      '</article>';
+  });
+
+  html += '</section>';
+
+  if (puedeGestionar) {
+    html +=
+      '<form id="formulario-visitante">' +
+      '<h4>Registrar visitante</h4>' +
+      '<label for="nombre-visitante">Nombre</label>' +
+      '<input type="text" id="nombre-visitante" name="nombre" required>' +
+      '<label for="telefono-visitante">Teléfono</label>' +
+      '<input type="text" id="telefono-visitante" name="telefono">' +
+      '<label for="observacion-visitante">Observación</label>' +
+      '<textarea id="observacion-visitante" name="observacion" rows="2"></textarea>' +
+      '<p id="mensaje-error-visitante" class="alerta oculto"></p>' +
+      '<div class="botones"><button type="submit" class="btn btn-primario">Guardar visitante</button></div>' +
+      '</form>';
+  }
+
+  contenedorDetalle.innerHTML = html;
+  contenedorRedes.classList.add('oculto');
+  contenedorDetalle.classList.remove('oculto');
+  botonVolver.classList.remove('oculto');
+
+  if (puedeGestionar) {
+    document.querySelector('#guardar-asistencia').addEventListener('click', guardarAsistencia);
+    document.querySelector('#formulario-visitante').addEventListener('submit', agregarVisitante);
+  }
+}
+
+async function guardarAsistencia() {
+  const chequeos = document.querySelectorAll('#asistencia-lista input[type="checkbox"]');
+  const mensaje = document.querySelector('#mensaje-asistencia');
+  mensaje.classList.add('oculto');
+
+  await Promise.all(Array.from(chequeos).map(async (chequeo) => {
+    await fetch('/api/reuniones/' + reunionActual.id + '/asistencia', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        personaId: Number(chequeo.dataset.personaId),
+        asistio: chequeo.checked
+      })
+    });
+  }));
+
+  mensaje.textContent = 'Asistencia guardada.';
+  mensaje.classList.remove('oculto');
+}
+
+async function agregarVisitante(evento) {
+  evento.preventDefault();
+
+  const formularioVisitante = evento.target;
+  const mensajeErrorVisitante = document.querySelector('#mensaje-error-visitante');
+  mensajeErrorVisitante.classList.add('oculto');
+
+  const datos = {
+    nombre: formularioVisitante.nombre.value,
+    telefono: formularioVisitante.telefono.value,
+    observacion: formularioVisitante.observacion.value
+  };
+
+  const respuesta = await fetch('/api/reuniones/' + reunionActual.id + '/visitantes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(datos)
+  });
+
+  const resultado = await respuesta.json();
+
+  if (!respuesta.ok) {
+    mensajeErrorVisitante.textContent = resultado.error;
+    mensajeErrorVisitante.classList.remove('oculto');
+    return;
+  }
+
+  verDetalleReunion();
+}
+
 function clasePorRol(rol) {
   if (rol === 'Líder') return 'lider';
   if (rol === 'Apoyo') return 'apoyo';
@@ -285,7 +433,9 @@ function clasePorRol(rol) {
 }
 
 function volver() {
-  if (pantalla === 'integrantes') {
+  if (pantalla === 'reunion') {
+    verIntegrantesDeGrupo();
+  } else if (pantalla === 'integrantes') {
     verGruposDeRed();
   } else if (pantalla === 'grupos') {
     mostrarRedes();

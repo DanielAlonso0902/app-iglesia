@@ -220,6 +220,107 @@ app.post('/api/grupos/:id/reuniones', requiereSesion, requiereRol(['Administrado
   res.status(201).json({ id: Number(resultado.lastInsertRowid), fecha, tipo, realizada, duracion, observacion });
 });
 
+app.get('/api/reuniones/:id', requiereSesion, (req, res) => {
+  const reunionId = Number(req.params.id);
+  const reunion = db.prepare('SELECT * FROM reuniones WHERE id = ?').get(reunionId);
+
+  if (!reunion) {
+    res.status(404).json({ error: 'Reunión no encontrada.' });
+    return;
+  }
+
+  if (!puedeVerGrupo(reunion.grupo_id, req.usuario)) {
+    res.status(403).json({ error: 'No puedes consultar esta reunión.' });
+    return;
+  }
+
+  const integrantes = db.prepare(`
+    SELECT p.id, p.nombre_completo, pg.rol, ar.asistio
+    FROM persona_grupo pg
+    JOIN personas p ON p.id = pg.persona_id
+    LEFT JOIN asistencia_reunion ar ON ar.reunion_id = ? AND ar.persona_id = p.id
+    WHERE pg.grupo_id = ? AND pg.activo = 1
+    ORDER BY CASE pg.rol WHEN 'Líder' THEN 0 WHEN 'Apoyo' THEN 1 WHEN 'Anfitrión' THEN 2 ELSE 3 END, p.nombre_completo
+  `).all(reunionId, reunion.grupo_id);
+
+  const visitantes = db.prepare('SELECT * FROM visitantes WHERE reunion_id = ?').all(reunionId);
+
+  res.json({ reunion, integrantes, visitantes });
+});
+
+app.post('/api/reuniones/:id/asistencia', requiereSesion, requiereRol(['Administrador', 'Líder de Grupo']), (req, res) => {
+  const reunionId = Number(req.params.id);
+  const reunion = db.prepare('SELECT * FROM reuniones WHERE id = ?').get(reunionId);
+
+  if (!reunion) {
+    res.status(404).json({ error: 'Reunión no encontrada.' });
+    return;
+  }
+
+  if (req.usuario.rol !== 'Administrador' && !puedeVerGrupo(reunion.grupo_id, req.usuario)) {
+    res.status(403).json({ error: 'Solo puedes registrar asistencia en tus propios grupos.' });
+    return;
+  }
+
+  const personaId = Number(req.body.personaId);
+  const persona = db.prepare('SELECT id FROM personas WHERE id = ?').get(personaId);
+
+  if (!persona) {
+    res.status(400).json({ error: 'La persona no existe.' });
+    return;
+  }
+
+  const pertenece = db.prepare('SELECT id FROM persona_grupo WHERE persona_id = ? AND grupo_id = ? AND activo = 1').get(personaId, reunion.grupo_id);
+
+  if (!pertenece) {
+    res.status(400).json({ error: 'La persona no es integrante activo de este grupo.' });
+    return;
+  }
+
+  const asistio = req.body.asistio ? 1 : 0;
+
+  db.prepare(`
+    INSERT INTO asistencia_reunion (reunion_id, persona_id, asistio)
+    VALUES (?, ?, ?)
+    ON CONFLICT (reunion_id, persona_id)
+    DO UPDATE SET asistio = excluded.asistio
+  `).run(reunionId, personaId, asistio);
+
+  res.json({ ok: true, personaId, asistio });
+});
+
+app.post('/api/reuniones/:id/visitantes', requiereSesion, requiereRol(['Administrador', 'Líder de Grupo']), (req, res) => {
+  const reunionId = Number(req.params.id);
+  const reunion = db.prepare('SELECT * FROM reuniones WHERE id = ?').get(reunionId);
+
+  if (!reunion) {
+    res.status(404).json({ error: 'Reunión no encontrada.' });
+    return;
+  }
+
+  if (req.usuario.rol !== 'Administrador' && !puedeVerGrupo(reunion.grupo_id, req.usuario)) {
+    res.status(403).json({ error: 'Solo puedes registrar visitantes en tus propios grupos.' });
+    return;
+  }
+
+  const nombre = req.body.nombre;
+
+  if (!nombre) {
+    res.status(400).json({ error: 'El nombre del visitante es obligatorio.' });
+    return;
+  }
+
+  const telefono = req.body.telefono || null;
+  const observacion = req.body.observacion || null;
+
+  const resultado = db.prepare(`
+    INSERT INTO visitantes (reunion_id, nombre, telefono, observacion)
+    VALUES (?, ?, ?, ?)
+  `).run(reunionId, nombre, telefono, observacion);
+
+  res.status(201).json({ id: Number(resultado.lastInsertRowid), nombre, telefono, observacion });
+});
+
 const rolesValidos = ['Líder', 'Apoyo', 'Anfitrión', 'Integrante'];
 
 app.post('/api/grupos/:id/integrantes', requiereSesion, requiereRol(['Administrador', 'Líder de Grupo']), (req, res) => {
