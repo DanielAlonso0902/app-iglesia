@@ -67,29 +67,31 @@ insertarUsuario.run('1000000001', bcrypt.hashSync('admin123', 10), 'Administrado
 insertarUsuario.run('1023456789', bcrypt.hashSync('carlos123', 10), 'Líder de Grupo', carlos);
 insertarUsuario.run('1034567890', bcrypt.hashSync('maria123', 10), 'Líder de Red', maria);
 
-console.log('Datos de ejemplo creados correctamente.');
+if (require.main === module) {
+  console.log('Datos de ejemplo creados correctamente.');
 
-const consultaHistorial = db.prepare(`
-  SELECT personas.nombre_completo, grupos.nombre AS grupo, persona_grupo.rol, persona_grupo.fecha_inicio, persona_grupo.fecha_fin, persona_grupo.activo
-  FROM persona_grupo
-  JOIN personas ON personas.id = persona_grupo.persona_id
-  JOIN grupos ON grupos.id = persona_grupo.grupo_id
-  ORDER BY personas.nombre_completo, persona_grupo.fecha_inicio
-`);
-console.log('\nHistorial de participacion (persona | grupo | rol | inicio | fin | activo):');
-consultaHistorial.all().forEach((fila) =>
-  console.log(fila.nombre_completo + ' | ' + fila.grupo + ' | ' + fila.rol + ' | ' + fila.fecha_inicio + ' | ' + fila.fecha_fin + ' | ' + fila.activo)
-);
+  const consultaHistorial = db.prepare(`
+    SELECT personas.nombre_completo, grupos.nombre AS grupo, persona_grupo.rol, persona_grupo.fecha_inicio, persona_grupo.fecha_fin, persona_grupo.activo
+    FROM persona_grupo
+    JOIN personas ON personas.id = persona_grupo.persona_id
+    JOIN grupos ON grupos.id = persona_grupo.grupo_id
+    ORDER BY personas.nombre_completo, persona_grupo.fecha_inicio
+  `);
+  console.log('\nHistorial de participacion (persona | grupo | rol | inicio | fin | activo):');
+  consultaHistorial.all().forEach((fila) =>
+    console.log(fila.nombre_completo + ' | ' + fila.grupo + ' | ' + fila.rol + ' | ' + fila.fecha_inicio + ' | ' + fila.fecha_fin + ' | ' + fila.activo)
+  );
 
-const consultaFormacion = db.prepare(`
-  SELECT personas.nombre_completo, proceso_formacion.etapa, proceso_formacion.promedio, proceso_formacion.activo
-  FROM proceso_formacion
-  JOIN personas ON personas.id = proceso_formacion.persona_id
-  ORDER BY personas.nombre_completo, proceso_formacion.etapa
-`);
-console.log('\nFormacion (persona | etapa | promedio | activo):');
-consultaFormacion.all().forEach((fila) =>
-  console.log(fila.nombre_completo + ' | ' + fila.etapa + ' | ' + fila.promedio + ' | ' + fila.activo)
-);
+  const consultaFormacion = db.prepare(`
+    SELECT personas.nombre_completo, proceso_formacion.etapa, proceso_formacion.promedio, proceso_formacion.activo
+    FROM proceso_formacion
+    JOIN personas ON personas.id = proceso_formacion.persona_id
+    ORDER BY personas.nombre_completo, proceso_formacion.etapa
+  `);
+  console.log('\nFormacion (persona | etapa | promedio | activo):');
+  consultaFormacion.all().forEach((fila) =>
+    console.log(fila.nombre_completo + ' | ' + fila.etapa + ' | ' + fila.promedio + ' | ' + fila.activo)
+  );
 
-db.close();
+  db.close();
+}
