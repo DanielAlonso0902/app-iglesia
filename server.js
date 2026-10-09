@@ -142,16 +142,23 @@ async function puedeVerRed(redId, usuario) {
     return true;
   }
 
-  if (usuario.rol === 'Líder de Red') {
-    if (!usuario.persona_id) return false;
+  if (!usuario.persona_id) return false;
 
+  if (usuario.rol === 'Líder de Red') {
     return !!(await db.prepare(`
       SELECT id FROM persona_red
       WHERE persona_id = ? AND red_id = ? AND activo = 1
     `).get(usuario.persona_id, redId));
   }
 
-  return false;
+  const pertenencia = await db.prepare(`
+    SELECT pg.id
+    FROM persona_grupo pg
+    JOIN grupos g ON g.id = pg.grupo_id
+    WHERE pg.persona_id = ? AND g.red_id = ? AND pg.activo = 1 AND g.activo = 1
+  `).get(usuario.persona_id, redId);
+
+  return !!pertenencia;
 }
 
 app.get('/api/personas/:id', requiereSesion, async (req, res) => {
@@ -359,7 +366,27 @@ app.patch('/api/redes/:id/estado', requiereSesion, requiereRol(['Administrador',
   res.json({ id: redId, activo });
 });
 
-app.post('/api/grupos', requiereSesion, requiereRol(['Administrador', 'Pastor']), async (req, res) => {
+app.patch('/api/redes/:id', requiereSesion, requiereRol(['Administrador', 'Pastor']), async (req, res) => {
+  const redId = Number(req.params.id);
+  const red = await db.prepare('SELECT id FROM redes WHERE id = ?').get(redId);
+
+  if (!red) {
+    res.status(404).json({ error: 'Red no encontrada.' });
+    return;
+  }
+
+  const nombre = req.body.nombre;
+  if (!nombre) {
+    res.status(400).json({ error: 'El nombre de la red es obligatorio.' });
+    return;
+  }
+
+  await db.prepare('UPDATE redes SET nombre = ? WHERE id = ?').run(nombre, redId);
+
+  res.json({ id: redId, nombre });
+});
+
+app.post('/api/grupos', requiereSesion, requiereRol(['Administrador', 'Pastor', 'Líder de Red']), async (req, res) => {
   const redId = Number(req.body.red_id);
   const nombre = req.body.nombre;
   const diasValidos = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
@@ -378,6 +405,11 @@ app.post('/api/grupos', requiereSesion, requiereRol(['Administrador', 'Pastor'])
 
   if (horaHabitual && !/^\d{1,2}:\d{2} (AM|PM)$/.test(horaHabitual)) {
     res.status(400).json({ error: 'La hora habitual debe ser como 5:30 PM.' });
+    return;
+  }
+
+  if (!(await puedeVerRed(redId, req.usuario))) {
+    res.status(403).json({ error: 'Solo puedes crear grupos en tu propia red.' });
     return;
   }
 
@@ -787,11 +819,35 @@ app.patch('/api/mi-contrasena', requiereSesion, async (req, res) => {
 });
 
 app.get('/api/redes', requiereSesion, async (req, res) => {
-  const incluirInactivas = req.query.todas === '1' && (req.usuario.rol === 'Administrador' || req.usuario.rol === 'Pastor');
+  const esAdministrador = req.usuario.rol === 'Administrador' || req.usuario.rol === 'Pastor';
+  const incluirInactivas = req.query.todas === '1' && esAdministrador;
 
-  const redes = incluirInactivas
-    ? await db.prepare('SELECT * FROM redes ORDER BY nombre').all()
-    : await db.prepare('SELECT * FROM redes WHERE activo = 1 ORDER BY nombre').all();
+  if (esAdministrador) {
+    const redes = incluirInactivas
+      ? await db.prepare('SELECT * FROM redes ORDER BY nombre').all()
+      : await db.prepare('SELECT * FROM redes WHERE activo = 1 ORDER BY nombre').all();
+    res.json(redes);
+    return;
+  }
+
+  if (!req.usuario.persona_id) {
+    res.json([]);
+    return;
+  }
+
+  const redes = await db.prepare(`
+    SELECT * FROM redes
+    WHERE activo = 1
+      AND id IN (
+        SELECT red_id FROM persona_red WHERE persona_id = ? AND activo = 1
+        UNION
+        SELECT g.red_id
+        FROM persona_grupo pg
+        JOIN grupos g ON g.id = pg.grupo_id
+        WHERE pg.persona_id = ? AND pg.activo = 1 AND g.activo = 1
+      )
+    ORDER BY nombre
+  `).all(req.usuario.persona_id, req.usuario.persona_id);
 
   res.json(redes);
 });
@@ -813,6 +869,11 @@ app.get('/api/grupos', requiereSesion, async (req, res) => {
 
 app.get('/api/redes/:id/grupos', requiereSesion, async (req, res) => {
   const redId = Number(req.params.id);
+
+  if (!(await puedeVerRed(redId, req.usuario))) {
+    res.status(403).json({ error: 'No puedes consultar esta red.' });
+    return;
+  }
 
   const grupos = await db.prepare(`
     SELECT grupos.*, redes.nombre AS red

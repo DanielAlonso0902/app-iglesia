@@ -372,6 +372,19 @@ footer {
   flex: 2;
 }
 
+#formulario-crear-grupo-red .fila-hora {
+  display: flex;
+  gap: 0.5rem;
+}
+
+#formulario-crear-grupo-red .fila-hora select {
+  flex: 1;
+}
+
+#formulario-crear-grupo-red .fila-hora select:first-child {
+  flex: 2;
+}
+
 .btn-borde-rojo {
   background-color: transparent;
   color: #b3261e;

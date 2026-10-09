@@ -190,6 +190,51 @@
 
       <section id="detalle" class="oculto"></section>
 
+      <section id="seccion-crear-grupo-red" class="oculto">
+        <h3>Crear grupo en esta red</h3>
+        <form id="formulario-crear-grupo-red">
+          <label for="crear-grupo-red-nombre">Nombre</label>
+          <input type="text" id="crear-grupo-red-nombre" name="nombre" placeholder="Ej. Grupo #300" required>
+
+          <label for="crear-grupo-red-dia">Día habitual</label>
+          <select id="crear-grupo-red-dia" name="dia_habitual" required>
+            <option value="" disabled selected>Elegir día…</option>
+            <option>Lunes</option>
+            <option>Martes</option>
+            <option>Miércoles</option>
+            <option>Jueves</option>
+            <option>Viernes</option>
+            <option>Sábado</option>
+            <option>Domingo</option>
+          </select>
+
+          <label for="crear-grupo-red-hora">Hora habitual</label>
+          <div class="fila-hora">
+            <select id="crear-grupo-red-hora" name="hora_habitual" required></select>
+            <select id="crear-grupo-red-hora-periodo" name="hora_habitual_periodo">
+              <option>AM</option>
+              <option>PM</option>
+            </select>
+          </div>
+
+          <label for="crear-grupo-red-direccion">Dirección</label>
+          <input type="text" id="crear-grupo-red-direccion" name="direccion">
+
+          <label for="crear-grupo-red-barrio">Barrio</label>
+          <input type="text" id="crear-grupo-red-barrio" name="barrio">
+
+          <label for="crear-grupo-red-ciudad">Ciudad</label>
+          <input type="text" id="crear-grupo-red-ciudad" name="ciudad">
+
+          <p id="mensaje-error-crear-grupo-red" class="alerta oculto"></p>
+
+          <div class="botones">
+            <button type="submit" class="btn btn-primario">Crear grupo</button>
+            <button type="button" id="cancelar-crear-grupo-red" class="btn">Cancelar</button>
+          </div>
+        </form>
+      </section>
+
       <section id="seccion-busqueda" class="oculto">
         <form id="formulario-busqueda">
           <input type="search" id="campo-busqueda" name="q" placeholder="Nombre, cédula o celular" required>
@@ -265,6 +310,20 @@
           <summary>Redes existentes</summary>
           <div class="contenido-acordeon">
             <section id="lista-admin-redes"></section>
+
+            <form id="formulario-editar-red" class="oculto">
+              <h4>Editar red</h4>
+              <label for="editar-red-nombre">Nombre</label>
+              <input type="text" id="editar-red-nombre" name="nombre" required>
+
+              <p id="mensaje-error-editar-red" class="alerta oculto"></p>
+
+              <div class="botones">
+                <button type="submit" class="btn btn-primario">Guardar cambios</button>
+                <button type="button" id="boton-estado-red" class="btn btn-borde-rojo">Desactivar red</button>
+                <button type="button" id="cancelar-editar-red" class="btn">Cancelar</button>
+              </div>
+            </form>
           </div>
         </details>
 

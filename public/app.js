@@ -50,6 +50,10 @@ const formularioNuevaRed = document.querySelector('#formulario-nueva-red');
 const formularioNuevoGrupo = document.querySelector('#formulario-nuevo-grupo');
 const selectGrupoRed = document.querySelector('#grupo-red');
 const listaAdminRedes = document.querySelector('#lista-admin-redes');
+const formularioEditarRed = document.querySelector('#formulario-editar-red');
+const cancelarEditarRed = document.querySelector('#cancelar-editar-red');
+const mensajeErrorEditarRed = document.querySelector('#mensaje-error-editar-red');
+const botonEstadoRed = document.querySelector('#boton-estado-red');
 const listaAdminGrupos = document.querySelector('#lista-admin-grupos');
 const formularioEditarGrupo = document.querySelector('#formulario-editar-grupo');
 const cancelarEditarGrupo = document.querySelector('#cancelar-editar-grupo');
@@ -68,6 +72,11 @@ const seccionCambioLiderRed = document.querySelector('#seccion-cambio-lider-red'
 const formularioCambioLiderRed = document.querySelector('#formulario-cambio-lider-red');
 const selectCambioRed = document.querySelector('#cambio-red');
 const selectCambioLiderPersona = document.querySelector('#cambio-lider-persona');
+
+const seccionCrearGrupoRed = document.querySelector('#seccion-crear-grupo-red');
+const formularioCrearGrupoRed = document.querySelector('#formulario-crear-grupo-red');
+const cancelarCrearGrupoRed = document.querySelector('#cancelar-crear-grupo-red');
+const mensajeErrorCrearGrupoRed = document.querySelector('#mensaje-error-crear-grupo-red');
 
 const botonCambiarContrasena = document.querySelector('#boton-cambiar-contrasena');
 const seccionCambiarContrasena = document.querySelector('#seccion-cambiar-contrasena');
@@ -188,8 +197,36 @@ async function verGruposDeRed() {
   formularioSection.classList.add('oculto');
   ocultarReuniones();
 
+  if (!respuesta.ok) {
+    contenedorDetalle.innerHTML = '<p class="vacio">' + (grupos.error || 'No tienes permiso.') + '</p>';
+    contenedorRedes.classList.add('oculto');
+    contenedorDetalle.classList.remove('oculto');
+    botonVolver.classList.remove('oculto');
+    seccionCrearGrupoRed.classList.add('oculto');
+    return;
+  }
+
+  const puedeCrearGrupo = usuarioActual && (usuarioActual.rol === 'Administrador' || usuarioActual.rol === 'Pastor' || usuarioActual.rol === 'Líder de Red');
+
+  if (puedeCrearGrupo) {
+    const botonCrear = document.createElement('button');
+    botonCrear.className = 'btn btn-primario boton-ancho';
+    botonCrear.textContent = 'Crear grupo en esta red';
+    botonCrear.addEventListener('click', () => abrirFormularioCrearGrupoRed());
+    contenedorDetalle.appendChild(botonCrear);
+
+    formularioCrearGrupoRed.reset();
+    formularioCrearGrupoRed.hora_habitual_periodo.value = 'PM';
+    seccionCrearGrupoRed.classList.add('oculto');
+  } else {
+    seccionCrearGrupoRed.classList.add('oculto');
+  }
+
   if (grupos.length === 0) {
-    contenedorDetalle.innerHTML = '<p class="vacio">Esta red aún no tiene grupos.</p>';
+    const vacio = document.createElement('p');
+    vacio.className = 'vacio';
+    vacio.textContent = 'Esta red aún no tiene grupos.';
+    contenedorDetalle.appendChild(vacio);
   }
 
   grupos.forEach((grupo) => {
@@ -214,12 +251,56 @@ async function verGruposDeRed() {
   seccionCambioLiderRed.classList.add('oculto');
 }
 
+function abrirFormularioCrearGrupoRed() {
+  mensajeErrorCrearGrupoRed.classList.add('oculto');
+  seccionCrearGrupoRed.classList.remove('oculto');
+  formularioCrearGrupoRed.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function cerrarFormularioCrearGrupoRed() {
+  seccionCrearGrupoRed.classList.add('oculto');
+  formularioCrearGrupoRed.reset();
+}
+
+async function crearGrupoEnRed(evento) {
+  evento.preventDefault();
+  mensajeErrorCrearGrupoRed.classList.add('oculto');
+
+  const datos = {
+    red_id: redActual.id,
+    nombre: formularioCrearGrupoRed.nombre.value,
+    dia_habitual: formularioCrearGrupoRed.dia_habitual.value,
+    hora_habitual: formularioCrearGrupoRed.hora_habitual.value + ' ' + formularioCrearGrupoRed.hora_habitual_periodo.value,
+    direccion: formularioCrearGrupoRed.direccion.value,
+    barrio: formularioCrearGrupoRed.barrio.value,
+    ciudad: formularioCrearGrupoRed.ciudad.value
+  };
+
+  const respuesta = await fetch('/api/grupos', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(datos)
+  });
+
+  const resultado = await respuesta.json();
+
+  if (!respuesta.ok) {
+    mensajeErrorCrearGrupoRed.textContent = resultado.error;
+    mensajeErrorCrearGrupoRed.classList.remove('oculto');
+    return;
+  }
+
+  cerrarFormularioCrearGrupoRed();
+  await verGruposDeRed();
+}
+
 async function verIntegrantesDeGrupo() {
   const respuesta = await fetch('/api/grupos/' + grupoActual.id + '/integrantes');
   const resultado = await respuesta.json();
 
   tituloPagina.textContent = grupoActual.nombre;
   contenedorDetalle.innerHTML = '';
+  seccionCrearGrupoRed.classList.add('oculto');
 
   if (!respuesta.ok) {
     pantalla = 'integrantes';
@@ -988,6 +1069,7 @@ function mostrarRedes() {
   resultados.innerHTML = '';
   seccionReportes.classList.add('oculto');
   seccionAdmin.classList.add('oculto');
+  seccionCrearGrupoRed.classList.add('oculto');
   botonAdmin.classList.remove('activo');
   botonRedes.classList.add('activo');
   botonBuscar.classList.remove('activo');
@@ -1105,6 +1187,7 @@ async function cargarReportes() {
   resultados.innerHTML = '';
   seccionReportes.classList.remove('oculto');
   seccionAdmin.classList.add('oculto');
+  seccionCrearGrupoRed.classList.add('oculto');
   botonAdmin.classList.remove('activo');
   mensajeErrorReportes.classList.add('oculto');
   botonReportes.classList.add('activo');
@@ -1202,6 +1285,7 @@ async function cargarAdmin() {
   resultados.innerHTML = '';
   seccionReportes.classList.add('oculto');
   seccionAdmin.classList.remove('oculto');
+  seccionCrearGrupoRed.classList.add('oculto');
   mensajeErrorAdmin.classList.add('oculto');
   botonAdmin.classList.add('activo');
   botonRedes.classList.remove('activo');
@@ -1211,10 +1295,11 @@ async function cargarAdmin() {
 }
 
 async function cargarListasAdmin() {
-  const respuestaRedes = await fetch('/api/redes');
+  const respuestaRedes = await fetch('/api/redes?todas=1');
   const redes = await respuestaRedes.json();
 
-  const opcionesRedes = redes.map((red) => '<option value="' + red.id + '">' + red.nombre + '</option>').join('');
+  const redesActivas = redes.filter((red) => red.activo === 1);
+  const opcionesRedes = redesActivas.map((red) => '<option value="' + red.id + '">' + red.nombre + '</option>').join('');
   selectGrupoRed.innerHTML = opcionesRedes;
   selectUsuarioRed.innerHTML = opcionesRedes;
   renderAdminRedes(redes);
@@ -1254,11 +1339,96 @@ function renderAdminRedes(redes) {
     tarjeta.className = 'tarjeta tarjeta-persona';
     tarjeta.innerHTML = '<strong>' + red.nombre + '</strong>' +
       '<span>' + (red.activo === 1 ? 'Activa' : 'Inactiva') + '</span>' +
-      (red.activo === 1 ? '<button class="btn btn-borde-rojo">Desactivar</button>' : '<button class="btn btn-secundario">Activar</button>');
+      '<button class="btn btn-secundario">Editar red</button>';
 
-    tarjeta.querySelector('button').addEventListener('click', () => cambiarEstadoRed(red.id, red.activo === 1 ? 0 : 1));
+    tarjeta.querySelector('button').addEventListener('click', () => abrirFormularioEditarRed(red));
     listaAdminRedes.appendChild(tarjeta);
   });
+}
+
+let redEnEdicion = null;
+let estadoRedEnEdicion = 1;
+
+function abrirFormularioEditarRed(red) {
+  redEnEdicion = red.id;
+  estadoRedEnEdicion = red.activo === 1 ? 1 : 0;
+  mensajeErrorEditarRed.classList.add('oculto');
+
+  formularioEditarRed.nombre.value = red.nombre;
+  formularioEditarRed.classList.remove('oculto');
+
+  botonEstadoRed.textContent = red.activo === 1 ? 'Desactivar red' : 'Activar red';
+  botonEstadoRed.className = red.activo === 1 ? 'btn btn-borde-rojo' : 'btn btn-secundario';
+
+  formularioEditarRed.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function cerrarFormularioEditarRed() {
+  formularioEditarRed.classList.add('oculto');
+  formularioEditarRed.reset();
+  redEnEdicion = null;
+  estadoRedEnEdicion = 1;
+}
+
+async function guardarEdicionRed(evento) {
+  evento.preventDefault();
+  mensajeErrorEditarRed.classList.add('oculto');
+
+  const nombre = formularioEditarRed.nombre.value.trim();
+
+  if (!nombre) {
+    mensajeErrorEditarRed.textContent = 'El nombre es obligatorio.';
+    mensajeErrorEditarRed.classList.remove('oculto');
+    return;
+  }
+
+  const respuesta = await fetch('/api/redes/' + redEnEdicion, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nombre })
+  });
+
+  const resultado = await respuesta.json();
+
+  if (!respuesta.ok) {
+    mensajeErrorEditarRed.textContent = resultado.error;
+    mensajeErrorEditarRed.classList.remove('oculto');
+    return;
+  }
+
+  cerrarFormularioEditarRed();
+  await cargarListasAdmin();
+}
+
+async function cambiarEstadoRedDesdeFormulario() {
+  if (!redEnEdicion) return;
+
+  const nueva = estadoRedEnEdicion === 1 ? 0 : 1;
+  const accion = nueva === 0
+    ? 'Desactivar esta red ocultará sus grupos e información. ¿Continuar?'
+    : '¿Activar esta red nuevamente?';
+
+  if (!confirm(accion)) return;
+
+  const respuesta = await fetch('/api/redes/' + redEnEdicion + '/estado', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ activo: nueva })
+  });
+
+  const resultado = await respuesta.json();
+
+  if (!respuesta.ok) {
+    mensajeErrorEditarRed.textContent = resultado.error;
+    mensajeErrorEditarRed.classList.remove('oculto');
+    return;
+  }
+
+  estadoRedEnEdicion = nueva;
+  botonEstadoRed.textContent = nueva === 1 ? 'Desactivar red' : 'Activar red';
+  botonEstadoRed.className = nueva === 1 ? 'btn btn-borde-rojo' : 'btn btn-secundario';
+  cerrarFormularioEditarRed();
+  await cargarListasAdmin();
 }
 
 function renderAdminGrupos(grupos) {
@@ -1365,15 +1535,6 @@ async function reiniciarDatos() {
 
   mensajeErrorAdmin.textContent = resultado.mensaje;
   mensajeErrorAdmin.classList.remove('oculto');
-  await cargarListasAdmin();
-}
-
-async function cambiarEstadoRed(redId, activo) {
-  await fetch('/api/redes/' + redId + '/estado', {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ activo })
-  });
   await cargarListasAdmin();
 }
 
@@ -1619,11 +1780,16 @@ botonReportes.addEventListener('click', cargarReportes);
 botonAdmin.addEventListener('click', cargarAdmin);
 formularioNuevaRed.addEventListener('submit', crearRed);
 formularioNuevoGrupo.addEventListener('submit', crearGrupo);
+formularioCrearGrupoRed.addEventListener('submit', crearGrupoEnRed);
+cancelarCrearGrupoRed.addEventListener('click', cerrarFormularioCrearGrupoRed);
 formularioUsuario.addEventListener('submit', crearUsuario);
 selectUsuarioRol.addEventListener('change', actualizarCamposUsuario);
 selectUsuarioPersona.addEventListener('change', actualizarCamposUsuario);
 formularioEditarGrupo.addEventListener('submit', guardarEdicionGrupo);
 cancelarEditarGrupo.addEventListener('click', cerrarFormularioEditarGrupo);
+formularioEditarRed.addEventListener('submit', guardarEdicionRed);
+cancelarEditarRed.addEventListener('click', cerrarFormularioEditarRed);
+botonEstadoRed.addEventListener('click', cambiarEstadoRedDesdeFormulario);
 document.querySelector('#boton-reiniciar-datos').addEventListener('click', reiniciarDatos);
 formularioCambioLiderRed.addEventListener('submit', transferirLiderRed);
 
@@ -1645,6 +1811,11 @@ horas.forEach((h) => {
     opcionEditar.value = h + ':' + minuto;
     opcionEditar.textContent = h + ':' + minuto;
     formularioEditarGrupo.hora_habitual.appendChild(opcionEditar);
+
+    const opcionCrearRed = document.createElement('option');
+    opcionCrearRed.value = h + ':' + minuto;
+    opcionCrearRed.textContent = h + ':' + minuto;
+    formularioCrearGrupoRed.hora_habitual.appendChild(opcionCrearRed);
   });
 });
 
