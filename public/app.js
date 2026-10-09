@@ -1621,7 +1621,9 @@ horas.forEach((h) => {
     opcion.textContent = h + ':' + minuto;
     formularioNuevoGrupo.hora_habitual.appendChild(opcion);
 
-    const opcionEditar = opcion.cloneNode();
+    const opcionEditar = document.createElement('option');
+    opcionEditar.value = h + ':' + minuto;
+    opcionEditar.textContent = h + ':' + minuto;
     formularioEditarGrupo.hora_habitual.appendChild(opcionEditar);
   });
 });
