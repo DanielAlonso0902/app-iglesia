@@ -1349,6 +1349,25 @@ async function guardarEdicionGrupo(evento) {
   await cargarListasAdmin();
 }
 
+async function reiniciarDatos() {
+  if (!confirm('¿Vaciar TODOS los grupos, personas y usuarios? Esta acción no se puede deshacer.')) {
+    return;
+  }
+
+  const respuesta = await fetch('/api/reiniciar-datos', { method: 'POST' });
+  const resultado = await respuesta.json();
+
+  if (!respuesta.ok) {
+    mensajeErrorAdmin.textContent = resultado.error;
+    mensajeErrorAdmin.classList.remove('oculto');
+    return;
+  }
+
+  mensajeErrorAdmin.textContent = resultado.mensaje;
+  mensajeErrorAdmin.classList.remove('oculto');
+  await cargarListasAdmin();
+}
+
 async function cambiarEstadoRed(redId, activo) {
   await fetch('/api/redes/' + redId + '/estado', {
     method: 'PATCH',
@@ -1605,6 +1624,7 @@ selectUsuarioRol.addEventListener('change', actualizarCamposUsuario);
 selectUsuarioPersona.addEventListener('change', actualizarCamposUsuario);
 formularioEditarGrupo.addEventListener('submit', guardarEdicionGrupo);
 cancelarEditarGrupo.addEventListener('click', cerrarFormularioEditarGrupo);
+document.querySelector('#boton-reiniciar-datos').addEventListener('click', reiniciarDatos);
 formularioCambioLiderRed.addEventListener('submit', transferirLiderRed);
 
 const horas = [];
