@@ -535,6 +535,12 @@ app.get('/api/reportes/formacion', requiereSesion, requiereRol(['Administrador',
     SELECT COALESCE(pf.etapa, 'Sin formación') AS etapa, COUNT(*) AS cantidad
     FROM personas p
     LEFT JOIN proceso_formacion pf ON pf.persona_id = p.id AND pf.activo = 1
+    WHERE p.id IN (
+      SELECT pg.persona_id
+      FROM persona_grupo pg
+      JOIN grupos g ON g.id = pg.grupo_id
+      WHERE pg.activo = 1 AND g.activo = 1
+    )
     GROUP BY pf.etapa
     ORDER BY cantidad DESC
   `).all();
@@ -546,6 +552,12 @@ app.get('/api/reportes/formacion', requiereSesion, requiereRol(['Administrador',
       SUM(CASE WHEN bautizado = 1 THEN 1 ELSE 0 END) AS bautizados,
       SUM(CASE WHEN en_discipulado = 1 THEN 1 ELSE 0 END) AS en_discipulado
     FROM personas
+    WHERE id IN (
+      SELECT pg.persona_id
+      FROM persona_grupo pg
+      JOIN grupos g ON g.id = pg.grupo_id
+      WHERE pg.activo = 1 AND g.activo = 1
+    )
   `).get();
 
   res.json({ porEtapa, resumen });
@@ -556,6 +568,12 @@ app.get('/api/reportes/formacion/csv', requiereSesion, requiereRol(['Administrad
     SELECT COALESCE(pf.etapa, 'Sin formación') AS etapa, COUNT(*) AS cantidad
     FROM personas p
     LEFT JOIN proceso_formacion pf ON pf.persona_id = p.id AND pf.activo = 1
+    WHERE p.id IN (
+      SELECT pg.persona_id
+      FROM persona_grupo pg
+      JOIN grupos g ON g.id = pg.grupo_id
+      WHERE pg.activo = 1 AND g.activo = 1
+    )
     GROUP BY pf.etapa
     ORDER BY cantidad DESC
   `).all();
@@ -567,6 +585,12 @@ app.get('/api/reportes/formacion/csv', requiereSesion, requiereRol(['Administrad
       SUM(CASE WHEN bautizado = 1 THEN 1 ELSE 0 END) AS bautizados,
       SUM(CASE WHEN en_discipulado = 1 THEN 1 ELSE 0 END) AS en_discipulado
     FROM personas
+    WHERE id IN (
+      SELECT pg.persona_id
+      FROM persona_grupo pg
+      JOIN grupos g ON g.id = pg.grupo_id
+      WHERE pg.activo = 1 AND g.activo = 1
+    )
   `).get();
 
   let csv = '\uFEFFEtapa;Cantidad\n';
