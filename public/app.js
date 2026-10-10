@@ -371,25 +371,6 @@ async function verIntegrantesDeGrupo() {
     contenedorDetalle.appendChild(fila);
   });
 
-  const puedeTransferirGrupo = usuarioActual && (usuarioActual.rol === 'Administrador' || usuarioActual.rol === 'Pastor' || usuarioActual.rol === 'Líder de Red');
-  if (puedeTransferirGrupo && integrantes.length > 0) {
-    const bloque = document.createElement('article');
-    bloque.className = 'tarjeta';
-    bloque.innerHTML =
-      '<h4>Transferir liderazgo del grupo</h4>' +
-      '<select id="select-nuevo-lider">' +
-        integrantes.map((presona) => '<option value="' + presona.id + '">' + presona.nombre_completo + '</option>').join('') +
-      '</select>' +
-      '<button class="btn btn-secundario">Transferir</button>';
-
-    bloque.querySelector('button').addEventListener('click', () => {
-      const nuevoLider = bloque.querySelector('select').value;
-      transferirLiderGrupo(nuevoLider);
-    });
-
-    contenedorDetalle.appendChild(bloque);
-  }
-
   const respuestaReuniones = await fetch('/api/grupos/' + grupoActual.id + '/reuniones');
   const reuniones = respuestaReuniones.ok ? await respuestaReuniones.json() : [];
   renderizarReuniones(reuniones, puedeGestionar);
@@ -605,22 +586,6 @@ async function retirarIntegrante(personaId, nombre) {
 
   if (!respuesta.ok) {
     window.alert(resultado.error || 'No se pudo retirar.');
-    return;
-  }
-
-  verIntegrantesDeGrupo();
-}
-
-async function transferirLiderGrupo(personaId) {
-  const respuesta = await fetch('/api/grupos/' + grupoActual.id + '/transferir-lider', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ persona_id: personaId })
-  });
-  const resultado = await respuesta.json();
-
-  if (!respuesta.ok) {
-    window.alert(resultado.error || 'No se pudo transferir.');
     return;
   }
 
