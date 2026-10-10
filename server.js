@@ -1163,6 +1163,69 @@ app.post('/api/reuniones/:id/visitantes', requiereSesion, requiereRol(['Administ
 
 const rolesValidos = ['Líder', 'Apoyo', 'Anfitrión', 'Integrante'];
 
+app.patch('/api/grupos/:id/integrantes/:personaId', requiereSesion, requiereRol(['Administrador', 'Pastor', 'Líder de Red', 'Líder de Grupo']), async (req, res) => {
+  const grupoId = Number(req.params.id);
+  const personaId = Number(req.params.personaId);
+
+  if (req.usuario.rol !== 'Administrador') {
+    if (!(await puedeVerGrupo(grupoId, req.usuario))) {
+      res.status(403).json({ error: 'Solo puedes editar integrantes en tus propios grupos.' });
+      return;
+    }
+  }
+
+  const pertenencia = await db.prepare(
+    'SELECT id FROM persona_grupo WHERE persona_id = ? AND grupo_id = ? AND activo = 1'
+  ).get(personaId, grupoId);
+
+  if (!pertenencia) {
+    res.status(404).json({ error: 'La persona no es integrante activo de este grupo.' });
+    return;
+  }
+
+  const rol = req.body.rol;
+
+  if (rol && !rolesValidos.includes(rol)) {
+    res.status(400).json({ error: 'El rol no es válido.' });
+    return;
+  }
+
+  const nombre = req.body.nombre;
+
+  if (!nombre) {
+    res.status(400).json({ error: 'El nombre es obligatorio.' });
+    return;
+  }
+
+  const cedula = req.body.cedula || null;
+  const celular = req.body.celular || null;
+  const direccion = req.body.direccion || null;
+
+  if (cedula) {
+    const duplicado = await db.prepare(`
+      SELECT p.id, p.nombre_completo
+      FROM personas p
+      LEFT JOIN usuarios u ON u.persona_id = p.id
+      WHERE p.activo = 1 AND p.id != ? AND (p.cedula = ? OR u.cedula = ?)
+    `).get(personaId, cedula, cedula);
+
+    if (duplicado) {
+      res.status(409).json({ error: 'Ya existe una persona con esa cédula: ' + duplicado.nombre_completo + '.' });
+      return;
+    }
+  }
+
+  await db.prepare(`
+    UPDATE personas SET nombre_completo = ?, cedula = ?, celular = ?, direccion = ? WHERE id = ?
+  `).run(nombre, cedula, celular, direccion, personaId);
+
+  if (rol) {
+    await db.prepare('UPDATE persona_grupo SET rol = ? WHERE id = ?').run(rol, pertenencia.id);
+  }
+
+  res.json({ id: personaId, nombre, cedula, celular, direccion, rol: rol || null });
+});
+
 app.post('/api/grupos/:id/integrantes', requiereSesion, requiereRol(['Administrador', 'Pastor', 'Líder de Red', 'Líder de Grupo']), async (req, res) => {
   const grupoId = Number(req.params.id);
 

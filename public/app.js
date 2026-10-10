@@ -13,6 +13,9 @@ const botonBuscarPersona = document.querySelector('#boton-buscar-persona');
 const resultadosBuscarPersona = document.querySelector('#resultados-persona');
 const mensajeBuscarPersona = document.querySelector('#mensaje-buscar-persona');
 const sugerenciaDuplicado = document.querySelector('#sugerencia-duplicado');
+const tituloFormularioIntegrante = document.querySelector('#formulario-section h3');
+const bloqueBuscarExistente = document.querySelector('#formulario-section .buscar-existente');
+const divisorFormulario = document.querySelector('#formulario-section .divisor');
 
 const botonAgregarReunion = document.querySelector('#boton-agregar-reunion');
 const formularioReunionSection = document.querySelector('#formulario-reunion-section');
@@ -98,6 +101,7 @@ let grupoActual = null;
 let reunionActual = null;
 let personaExpedienteId = null;
 let usuarioActual = null;
+let integrandoEditando = null;
 
 const etapasFormacion = ['Discípulo S1', 'Discípulo S2', 'Discípulo S3', 'Discípulo S4', 'Bendición N1', 'Bendición N2', 'Bendición N3', 'Ministerio de la Misericordia'];
 
@@ -210,8 +214,8 @@ async function verGruposDeRed() {
 
   if (puedeCrearGrupo) {
     const botonCrear = document.createElement('button');
-    botonCrear.className = 'btn btn-primario boton-ancho';
-    botonCrear.textContent = 'Crear grupo en esta red';
+    botonCrear.className = 'btn btn-secundario boton-ancho';
+    botonCrear.textContent = '+ Crear grupo en esta red';
     botonCrear.addEventListener('click', () => abrirFormularioCrearGrupoRed());
     contenedorDetalle.appendChild(botonCrear);
 
@@ -340,6 +344,17 @@ async function verIntegrantesDeGrupo() {
     });
 
     if (puedeGestionar) {
+      const acciones = document.createElement('div');
+      acciones.className = 'acciones-integrante';
+
+      const botonEditar = document.createElement('button');
+      botonEditar.className = 'btn btn-secundario btn-mini';
+      botonEditar.textContent = 'Editar';
+      botonEditar.addEventListener('click', (evento) => {
+        evento.stopPropagation();
+        abrirFormularioEdicion(persona);
+      });
+
       const botonRetirar = document.createElement('button');
       botonRetirar.className = 'btn btn-borde-rojo btn-mini';
       botonRetirar.textContent = 'Retirar';
@@ -347,7 +362,10 @@ async function verIntegrantesDeGrupo() {
         evento.stopPropagation();
         retirarIntegrante(persona.id, persona.nombre_completo);
       });
-      fila.appendChild(botonRetirar);
+
+      acciones.appendChild(botonEditar);
+      acciones.appendChild(botonRetirar);
+      fila.appendChild(acciones);
     }
 
     contenedorDetalle.appendChild(fila);
@@ -395,6 +413,28 @@ async function crearIntegrante(evento) {
     rol: formulario.rol.value
   };
 
+  if (integrandoEditando) {
+    const respuesta = await fetch('/api/grupos/' + grupoActual.id + '/integrantes/' + integrandoEditando.id, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(datos)
+    });
+
+    const resultado = await respuesta.json();
+
+    if (!respuesta.ok) {
+      mensajeError.textContent = resultado.error;
+      mensajeError.classList.remove('oculto');
+      return;
+    }
+
+    integrandoEditando = null;
+    formulario.reset();
+    cerrarFormulario();
+    verIntegrantesDeGrupo();
+    return;
+  }
+
   const respuesta = await fetch('/api/grupos/' + grupoActual.id + '/integrantes', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -429,14 +469,43 @@ async function crearIntegrante(evento) {
 }
 
 function abrirFormulario() {
+  integrandoEditando = null;
+  tituloFormularioIntegrante.textContent = 'Agregar integrante';
+  bloqueBuscarExistente.classList.remove('oculto');
+  divisorFormulario.classList.remove('oculto');
+  formulario.reset();
   botonAgregar.classList.add('oculto');
   formularioSection.classList.remove('oculto');
   ocultarBusquedaExistente();
   formulario.nombre.focus();
 }
 
+function abrirFormularioEdicion(persona) {
+  integrandoEditando = { id: persona.id };
+  tituloFormularioIntegrante.textContent = 'Editar integrante';
+  bloqueBuscarExistente.classList.add('oculto');
+  divisorFormulario.classList.add('oculto');
+  formulario.nombre.value = persona.nombre_completo || '';
+  formulario.cedula.value = persona.cedula || '';
+  formulario.celular.value = persona.celular || '';
+  formulario.direccion.value = persona.direccion || '';
+  formulario.rol.value = persona.rol || 'Integrante';
+  mensajeError.classList.add('oculto');
+  sugerenciaDuplicado.classList.add('oculto');
+  sugerenciaDuplicado.innerHTML = '';
+  botonAgregar.classList.add('oculto');
+  formularioSection.classList.remove('oculto');
+  ocultarBusquedaExistente();
+  formulario.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  formulario.nombre.focus();
+}
+
 function cerrarFormulario() {
   formularioSection.classList.add('oculto');
+  integrandoEditando = null;
+  tituloFormularioIntegrante.textContent = 'Agregar integrante';
+  bloqueBuscarExistente.classList.remove('oculto');
+  divisorFormulario.classList.remove('oculto');
   botonAgregar.classList.remove('oculto');
   ocultarBusquedaExistente();
 }
