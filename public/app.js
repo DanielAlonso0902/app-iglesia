@@ -149,7 +149,7 @@ function mostrarApp(usuario) {
     botonReportes.classList.add('oculto');
   }
 
-  if (usuario.rol === 'Administrador' || usuario.rol === 'Pastor') {
+  if (usuario.rol === 'Administrador' || usuario.rol === 'Pastor' || usuario.rol === 'Líder de Red') {
     botonAdmin.classList.remove('oculto');
   } else {
     botonAdmin.classList.add('oculto');
@@ -1360,7 +1360,26 @@ async function cargarAdmin() {
   botonRedes.classList.remove('activo');
   botonBuscar.classList.remove('activo');
   botonReportes.classList.remove('activo');
+  ajustarAcordeonesAdmin();
   await cargarListasAdmin();
+}
+
+function ajustarAcordeonesAdmin() {
+  const esAdmin = usuarioActual.rol === 'Administrador';
+  const esPastor = usuarioActual.rol === 'Pastor';
+  const esLiderRed = usuarioActual.rol === 'Líder de Red';
+
+  document.querySelector('#acordeon-crear-red').classList.toggle('oculto', !esAdmin && !esPastor);
+  document.querySelector('#acordeon-redes-existentes').classList.toggle('oculto', !esAdmin && !esPastor);
+  document.querySelector('#acordeon-grupos-existentes').classList.toggle('oculto', !esAdmin && !esPastor);
+  document.querySelector('#acordeon-usuarios').classList.toggle('oculto', !esAdmin && !esLiderRed);
+  document.querySelector('#acordeon-zona-riesgo').classList.toggle('oculto', !esAdmin);
+  document.querySelector('#acordeon-crear-grupo').classList.toggle('oculto', !esAdmin && !esPastor && !esLiderRed);
+
+  document.querySelectorAll('#usuario-rol option').forEach((opcion) => {
+    const prohibido = esLiderRed && (opcion.value === 'Administrador' || opcion.value === 'Pastor');
+    opcion.classList.toggle('oculto', prohibido);
+  });
 }
 
 async function cargarListasAdmin() {
@@ -1390,9 +1409,14 @@ async function cargarListasAdmin() {
       .join('');
   actualizarCamposUsuario();
 
-  const respuestaUsuarios = await fetch('/api/usuarios');
-  const usuarios = await respuestaUsuarios.json();
-  renderUsuarios(usuarios);
+  const puedeGestionarUsuarios = usuarioActual.rol === 'Administrador' || usuarioActual.rol === 'Líder de Red';
+  if (puedeGestionarUsuarios) {
+    const respuestaUsuarios = await fetch('/api/usuarios');
+    const usuarios = await respuestaUsuarios.json();
+    renderUsuarios(usuarios);
+  } else {
+    renderUsuarios([]);
+  }
 }
 
 function renderAdminRedes(redes) {
@@ -1625,23 +1649,22 @@ function renderUsuarios(usuarios) {
   }
 
   usuarios.forEach((usuario) => {
+    const esAdmin = usuarioActual.rol === 'Administrador';
     const tarjeta = document.createElement('article');
     tarjeta.className = 'tarjeta tarjeta-persona';
     tarjeta.innerHTML = '<strong>' + (usuario.nombre_completo || 'Sin persona') + '</strong>' +
       '<span>' + usuario.rol + ' · ' + usuario.cedula + (usuario.activo === 1 ? ' · Activo' : ' · Inactivo') + '</span>' +
-      (usuario.activo === 1
-        ? '<button class="btn btn-borde-rojo">Desactivar</button><button class="btn btn-secundario">Cambiar contraseña</button>'
-        : '<button class="btn btn-secundario">Activar</button>');
+      (esAdmin
+        ? (usuario.activo === 1
+          ? '<button class="btn btn-borde-rojo">Desactivar</button><button class="btn btn-secundario">Cambiar contraseña</button>'
+          : '<button class="btn btn-secundario">Activar</button>')
+        : '');
 
-    const botonEstado = tarjeta.querySelector('button');
-    if (usuario.activo === 1) {
-      botonEstado.addEventListener('click', () => cambiarEstadoUsuario(usuario.id, 0));
-    } else {
-      botonEstado.addEventListener('click', () => cambiarEstadoUsuario(usuario.id, 1));
-    }
-
-    if (usuario.activo === 1) {
+    if (esAdmin && usuario.activo === 1) {
+      tarjeta.querySelector('button').addEventListener('click', () => cambiarEstadoUsuario(usuario.id, 0));
       tarjeta.querySelectorAll('button')[1].addEventListener('click', () => cambiarContrasenaUsuario(usuario.id));
+    } else if (esAdmin) {
+      tarjeta.querySelector('button').addEventListener('click', () => cambiarEstadoUsuario(usuario.id, 1));
     }
 
     listaUsuarios.appendChild(tarjeta);

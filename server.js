@@ -515,7 +515,7 @@ app.post('/api/reiniciar-datos', requiereSesion, requiereRol(['Administrador']),
   res.json({ mensaje: 'Reinicio completo: quedan el administrador y las redes.' });
 });
 
-app.get('/api/usuarios', requiereSesion, requiereRol(['Administrador', 'Pastor']), async (req, res) => {
+app.get('/api/usuarios', requiereSesion, requiereRol(['Administrador', 'Líder de Red']), async (req, res) => {
   const usuarios = await db.prepare(`
     SELECT usuarios.id, usuarios.cedula, usuarios.rol, usuarios.activo, personas.nombre_completo
     FROM usuarios
@@ -525,7 +525,7 @@ app.get('/api/usuarios', requiereSesion, requiereRol(['Administrador', 'Pastor']
   res.json(usuarios);
 });
 
-app.post('/api/usuarios', requiereSesion, requiereRol(['Administrador', 'Pastor']), async (req, res) => {
+app.post('/api/usuarios', requiereSesion, requiereRol(['Administrador', 'Líder de Red']), async (req, res) => {
   let personaId = Number(req.body.persona_id);
   const nombrePersona = (req.body.nombre_persona || '').trim();
   const rol = req.body.rol;
@@ -550,6 +550,29 @@ app.post('/api/usuarios', requiereSesion, requiereRol(['Administrador', 'Pastor'
   if (!['Administrador', 'Pastor', 'Líder de Red', 'Líder de Grupo'].includes(rol)) {
     res.status(400).json({ error: 'Rol no válido.' });
     return;
+  }
+
+  if (req.usuario.rol === 'Líder de Red') {
+    if (rol === 'Administrador' || rol === 'Pastor') {
+      res.status(403).json({ error: 'Un líder de red solo crea usuarios del rol Líder de Red o Líder de Grupo.' });
+      return;
+    }
+
+    const puedeCrearEnRed = rol === 'Líder de Red'
+      ? await puedeVerRed(Number(req.body.red_id), req.usuario)
+      : false;
+
+    const puedeCrearEnGrupo = rol === 'Líder de Grupo'
+      ? await (async () => {
+          const grupo = await db.prepare('SELECT red_id FROM grupos WHERE id = ?').get(Number(req.body.grupo_id));
+          return grupo ? await puedeVerRed(grupo.red_id, req.usuario) : false;
+        })()
+      : false;
+
+    if (!puedeCrearEnRed && !puedeCrearEnGrupo) {
+      res.status(403).json({ error: 'Solo puedes crear usuarios dentro de tu propia red.' });
+      return;
+    }
   }
 
   if (!(await db.prepare('SELECT id FROM personas WHERE id = ?').get(personaId))) {
@@ -595,7 +618,7 @@ app.post('/api/usuarios', requiereSesion, requiereRol(['Administrador', 'Pastor'
   res.status(201).json({ id: Number(resultado.lastInsertRowid), cedula, rol });
 });
 
-app.patch('/api/usuarios/:id/estado', requiereSesion, requiereRol(['Administrador', 'Pastor']), async (req, res) => {
+app.patch('/api/usuarios/:id/estado', requiereSesion, requiereRol(['Administrador']), async (req, res) => {
   const usuarioId = Number(req.params.id);
 
   if (usuarioId === req.usuario.id) {
@@ -613,7 +636,7 @@ app.patch('/api/usuarios/:id/estado', requiereSesion, requiereRol(['Administrado
   res.json({ id: usuarioId, activo });
 });
 
-app.patch('/api/usuarios/:id/contrasena', requiereSesion, requiereRol(['Administrador', 'Pastor']), async (req, res) => {
+app.patch('/api/usuarios/:id/contrasena', requiereSesion, requiereRol(['Administrador']), async (req, res) => {
   const usuarioId = Number(req.params.id);
   const contrasena = req.body.contrasena;
 
@@ -853,9 +876,26 @@ app.get('/api/redes', requiereSesion, async (req, res) => {
 });
 
 app.get('/api/grupos', requiereSesion, async (req, res) => {
-  const incluirInactivos = req.query.todas === '1' && (req.usuario.rol === 'Administrador' || req.usuario.rol === 'Pastor');
+  const esAdministrador = req.usuario.rol === 'Administrador' || req.usuario.rol === 'Pastor';
+  const incluirInactivos = req.query.todas === '1' && esAdministrador;
 
-  const filtro = incluirInactivos ? '' : 'WHERE grupos.activo = 1 ';
+  const condiciones = incluirInactivos ? [] : ['grupos.activo = 1'];
+
+  if (!esAdministrador) {
+    condiciones.push(`
+      grupos.red_id IN (
+        SELECT red_id FROM persona_red WHERE persona_id = ? AND activo = 1
+        UNION
+        SELECT g.red_id
+        FROM persona_grupo pg
+        JOIN grupos g ON g.id = pg.grupo_id
+        WHERE pg.persona_id = ? AND pg.activo = 1 AND g.activo = 1
+      )
+    `);
+  }
+
+  const filtro = condiciones.length ? 'WHERE ' + condiciones.join(' AND ') : '';
+  const parametros = !esAdministrador ? [req.usuario.persona_id, req.usuario.persona_id] : [];
 
   const grupos = await db.prepare(`
     SELECT grupos.*, redes.nombre AS red
@@ -863,7 +903,7 @@ app.get('/api/grupos', requiereSesion, async (req, res) => {
     JOIN redes ON redes.id = grupos.red_id
     ${filtro}
     ORDER BY grupos.nombre
-  `).all();
+  `).all(...parametros);
   res.json(grupos);
 });
 
