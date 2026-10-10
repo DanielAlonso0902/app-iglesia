@@ -608,6 +608,81 @@ app.get('/api/reportes/formacion/csv', requiereSesion, requiereRol(['Administrad
   res.send(csv);
 });
 
+app.get('/api/reportes/miembros', requiereSesion, requiereRol(['Administrador', 'Pastor']), async (req, res) => {
+  const miembros = await db.prepare(`
+    SELECT
+      p.id,
+      p.nombre_completo,
+      COALESCE(p.cedula, '') AS cedula,
+      COALESCE(p.celular, '') AS celular,
+      COALESCE(p.direccion, '') AS direccion,
+      p.bautizado,
+      p.en_discipulado,
+      COALESCE(p.nivel_discipulado, '') AS nivel_discipulado,
+      p.es_nuevo,
+      string_agg(
+        DISTINCT g.nombre || ' (' || r.nombre || ')',
+        ' | '
+      ) AS grupos,
+      string_agg(DISTINCT pg.rol, ', ') AS roles
+    FROM personas p
+    JOIN persona_grupo pg ON pg.persona_id = p.id AND pg.activo = 1
+    JOIN grupos g ON g.id = pg.grupo_id AND g.activo = 1
+    JOIN redes r ON r.id = g.red_id
+    WHERE p.activo = 1
+    GROUP BY p.id
+    ORDER BY p.nombre_completo
+  `).all();
+
+  res.json(miembros);
+});
+
+app.get('/api/reportes/miembros/csv', requiereSesion, requiereRol(['Administrador', 'Pastor']), async (req, res) => {
+  const miembros = await db.prepare(`
+    SELECT
+      p.id,
+      p.nombre_completo,
+      COALESCE(p.cedula, '') AS cedula,
+      COALESCE(p.celular, '') AS celular,
+      COALESCE(p.direccion, '') AS direccion,
+      p.bautizado,
+      p.en_discipulado,
+      COALESCE(p.nivel_discipulado, '') AS nivel_discipulado,
+      p.es_nuevo,
+      string_agg(
+        DISTINCT g.nombre || ' (' || r.nombre || ')',
+        ' | '
+      ) AS grupos,
+      string_agg(DISTINCT pg.rol, ', ') AS roles
+    FROM personas p
+    JOIN persona_grupo pg ON pg.persona_id = p.id AND pg.activo = 1
+    JOIN grupos g ON g.id = pg.grupo_id AND g.activo = 1
+    JOIN redes r ON r.id = g.red_id
+    WHERE p.activo = 1
+    GROUP BY p.id
+    ORDER BY p.nombre_completo
+  `).all();
+
+  let csv = '\uFEFFNombre;Cédula;Teléfono;Dirección;Bautizado;Discipulado;Nivel;Nuevo;Grupos;Roles\n';
+  for (const m of miembros) {
+    csv +=
+      sanearCsv(m.nombre_completo) + ';' +
+      sanearCsv(m.cedula) + ';' +
+      sanearCsv(m.celular) + ';' +
+      sanearCsv(m.direccion) + ';' +
+      (m.bautizado === 1 ? 'Sí' : 'No') + ';' +
+      (m.en_discipulado === 1 ? 'Sí' : 'No') + ';' +
+      sanearCsv(m.nivel_discipulado) + ';' +
+      (m.es_nuevo === 1 ? 'Sí' : 'No') + ';' +
+      sanearCsv(m.grupos) + ';' +
+      sanearCsv(m.roles) + '\n';
+  }
+
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename=miembros-iglesia.csv');
+  res.send(csv);
+});
+
 app.get('/api/reportes/crecimiento', requiereSesion, requiereRol(['Administrador', 'Pastor']), async (req, res) => {
   const porMesNuevos = await db.prepare(`
     SELECT substr(fecha_inicio, 1, 7) AS mes, COUNT(DISTINCT persona_id) AS cantidad

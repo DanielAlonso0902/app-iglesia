@@ -1245,6 +1245,29 @@ function botonDescargar(url, etiqueta) {
   return '<a class="btn btn-secundario btn-descargar" href="' + url + '" download>' + etiqueta + '</a>';
 }
 
+function tablaMiembros(miembros) {
+  if (!miembros || miembros.length === 0) {
+    return '<p class="vacio">Aún no hay miembros registrados.</p>';
+  }
+
+  const filas = miembros.map((m) =>
+    '<tr>' +
+    '<td>' + m.nombre_completo + '</td>' +
+    '<td>' + (m.cedula || '') + '</td>' +
+    '<td>' + (m.celular || '') + '</td>' +
+    '<td>' + (m.direccion || '') + '</td>' +
+    '<td>' + (m.bautizado === 1 ? 'Sí' : 'No') + '</td>' +
+    '<td>' + (m.en_discipulado === 1 ? 'Sí (' + (m.nivel_discipulado || '') + ')' : 'No') + '</td>' +
+    '<td>' + (m.grupos || '') + '</td>' +
+    '<td>' + (m.roles || '') + '</td>' +
+    '</tr>'
+  ).join('');
+
+  return '<table class="tabla-reporte"><thead><tr>' +
+    '<th>Nombre</th><th>Cédula</th><th>Teléfono</th><th>Dirección</th><th>Bautizado</th><th>Discipulado</th><th>Grupos</th><th>Roles</th>' +
+    '</tr></thead><tbody>' + filas + '</tbody></table>';
+}
+
 function barrasDeEtapas(porEtapa, totalPersonas) {
   let html = '<section class="grafico-etapas">';
 
@@ -1286,6 +1309,8 @@ async function cargarReportes() {
 
   const crecimiento = document.querySelector('#reporte-crecimiento');
   crecimiento.innerHTML = '';
+  const miembros = document.querySelector('#reporte-miembros');
+  miembros.innerHTML = '';
 
   if (usuarioActual.rol === 'Administrador' || usuarioActual.rol === 'Pastor') {
     const respuesta = await fetch('/api/reportes/formacion');
@@ -1301,6 +1326,13 @@ async function cargarReportes() {
     crecimiento.innerHTML =
       tablasCrecimientoPorMes(reporteCrecimiento.porMes) +
       '<p class="acciones-reporte">' + botonDescargar('/api/reportes/crecimiento/csv', 'Descargar CSV') + '</p>';
+
+    const respuestaMiembros = await fetch('/api/reportes/miembros');
+    const miembrosIglesia = await respuestaMiembros.json();
+    miembros.innerHTML =
+      '<h3>Miembros de la iglesia <small>(' + miembrosIglesia.length + ')</small></h3>' +
+      '<p class="acciones-reporte">' + botonDescargar('/api/reportes/miembros/csv', 'Descargar CSV') + '</p>' +
+      tablaMiembros(miembrosIglesia);
   } else {
     reporteFormacion.innerHTML = '<h3>Formación de mi red</h3>';
   }
