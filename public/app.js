@@ -16,6 +16,10 @@ const sugerenciaDuplicado = document.querySelector('#sugerencia-duplicado');
 const tituloFormularioIntegrante = document.querySelector('#formulario-section h3');
 const bloqueBuscarExistente = document.querySelector('#formulario-section .buscar-existente');
 const divisorFormulario = document.querySelector('#formulario-section .divisor');
+const campoBautizado = document.querySelector('#bautizado');
+const campoEnDiscipulado = document.querySelector('#en-discipulado');
+const campoNivelDiscipulado = document.querySelector('#nivel-discipulado');
+const campoNivelDiscipuladoBloque = document.querySelector('#campo-nivel-discipulado');
 
 const botonAgregarReunion = document.querySelector('#boton-agregar-reunion');
 const formularioReunionSection = document.querySelector('#formulario-reunion-section');
@@ -334,9 +338,17 @@ async function verIntegrantesDeGrupo() {
   integrantes.forEach((persona) => {
     const fila = document.createElement('article');
     fila.className = 'integrante';
+    const indicadores = [];
+    if (persona.bautizado === 1) {
+      indicadores.push('<span class="indicador indicador-bautizado">Bautizado</span>');
+    }
+    if (persona.en_discipulado === 1) {
+      indicadores.push('<span class="indicador indicador-discipulado">Discipulado' + (persona.nivel_discipulado ? ': ' + persona.nivel_discipulado : '') + '</span>');
+    }
     fila.innerHTML =
       '<div class="avatar">' + persona.nombre_completo.charAt(0) + '</div>' +
-      '<div class="info"><strong>' + persona.nombre_completo + '</strong></div>' +
+      '<div class="info"><strong>' + persona.nombre_completo + '</strong>' +
+      (indicadores.length ? '<div class="indicadores">' + indicadores.join('') + '</div>' : '') + '</div>' +
       '<span class="rol rol-' + clasePorRol(persona.rol) + '">' + persona.rol + '</span>';
 
     fila.addEventListener('click', () => {
@@ -391,7 +403,10 @@ async function crearIntegrante(evento) {
     cedula: formulario.cedula.value,
     celular: formulario.celular.value,
     direccion: formulario.direccion.value,
-    rol: formulario.rol.value
+    rol: formulario.rol.value,
+    bautizado: campoBautizado.value === 'si' ? 1 : 0,
+    en_discipulado: campoEnDiscipulado.value === 'si' ? 1 : 0,
+    nivel_discipulado: campoEnDiscipulado.value === 'si' ? campoNivelDiscipulado.value : ''
   };
 
   if (integrandoEditando) {
@@ -455,10 +470,23 @@ function abrirFormulario() {
   bloqueBuscarExistente.classList.remove('oculto');
   divisorFormulario.classList.remove('oculto');
   formulario.reset();
+  campoBautizado.value = 'no';
+  campoEnDiscipulado.value = 'no';
+  campoNivelDiscipulado.value = '';
+  actualizarCampoNivelDiscipulado();
   botonAgregar.classList.add('oculto');
   formularioSection.classList.remove('oculto');
   ocultarBusquedaExistente();
   formulario.nombre.focus();
+}
+
+function actualizarCampoNivelDiscipulado() {
+  if (campoEnDiscipulado.value === 'si') {
+    campoNivelDiscipuladoBloque.classList.remove('oculto');
+  } else {
+    campoNivelDiscipuladoBloque.classList.add('oculto');
+    campoNivelDiscipulado.value = '';
+  }
 }
 
 function abrirFormularioEdicion(persona) {
@@ -471,6 +499,10 @@ function abrirFormularioEdicion(persona) {
   formulario.celular.value = persona.celular || '';
   formulario.direccion.value = persona.direccion || '';
   formulario.rol.value = persona.rol || 'Integrante';
+  campoBautizado.value = persona.bautizado === 1 ? 'si' : 'no';
+  campoEnDiscipulado.value = persona.en_discipulado === 1 ? 'si' : 'no';
+  campoNivelDiscipulado.value = persona.nivel_discipulado || '';
+  actualizarCampoNivelDiscipulado();
   mensajeError.classList.add('oculto');
   sugerenciaDuplicado.classList.add('oculto');
   sugerenciaDuplicado.innerHTML = '';
@@ -727,6 +759,7 @@ async function crearReunion(evento) {
 
   const datos = {
     fecha: formularioReunion.fecha.value,
+    tipo: formularioReunion.tipo.value,
     duracion: formularioReunion.duracion.value,
     observacion: formularioReunion.observacion.value
   };
@@ -1187,8 +1220,29 @@ function fichaDeTotales(numeros) {
     html += '<div class="total total-nuevos"><strong>' + numeros.nuevos + '</strong><span>nuevas</span></div>';
     html += '<div class="total total-bautizados"><strong>' + numeros.bautizados + '</strong><span>bautizadas</span></div>';
   }
+  if (numeros.en_discipulado !== undefined) {
+    html += '<div class="total total-discipulado"><strong>' + numeros.en_discipulado + '</strong><span>en discipulado</span></div>';
+  }
   html += '</section>';
   return html;
+}
+
+function tablasCrecimientoPorMes(porMes) {
+  if (!porMes || porMes.length === 0) {
+    return '<p class="vacio">Aún no hay datos por mes.</p>';
+  }
+
+  const filas = porMes.map((fila) =>
+    '<tr><td>' + fila.mes + '</td><td>' + fila.nuevos + '</td><td>' + fila.bautizados + '</td><td>' + fila.visitas + '</td></tr>'
+  ).join('');
+
+  return '<h3>Crecimiento por mes</h3>' +
+    '<table class="tabla-reporte"><thead><tr><th>Mes</th><th>Nuevos</th><th>Bautizados</th><th>Visitas</th></tr></thead><tbody>' +
+    filas + '</tbody></table>';
+}
+
+function botonDescargar(url, etiqueta) {
+  return '<a class="btn btn-secundario btn-descargar" href="' + url + '" download>' + etiqueta + '</a>';
 }
 
 function barrasDeEtapas(porEtapa, totalPersonas) {
@@ -1230,13 +1284,23 @@ async function cargarReportes() {
   reporteRed.innerHTML = '';
   listaMisRedes.innerHTML = '';
 
+  const crecimiento = document.querySelector('#reporte-crecimiento');
+  crecimiento.innerHTML = '';
+
   if (usuarioActual.rol === 'Administrador' || usuarioActual.rol === 'Pastor') {
     const respuesta = await fetch('/api/reportes/formacion');
     const reporte = await respuesta.json();
     reporteFormacion.innerHTML =
       '<h3>Formación general</h3>' +
       fichaDeTotales(reporte.resumen) +
-      barrasDeEtapas(reporte.porEtapa, reporte.resumen.personas);
+      barrasDeEtapas(reporte.porEtapa, reporte.resumen.personas) +
+      '<p class="acciones-reporte">' + botonDescargar('/api/reportes/formacion/csv', 'Descargar CSV') + '</p>';
+
+    const respuestaCrecimiento = await fetch('/api/reportes/crecimiento');
+    const reporteCrecimiento = await respuestaCrecimiento.json();
+    crecimiento.innerHTML =
+      tablasCrecimientoPorMes(reporteCrecimiento.porMes) +
+      '<p class="acciones-reporte">' + botonDescargar('/api/reportes/crecimiento/csv', 'Descargar CSV') + '</p>';
   } else {
     reporteFormacion.innerHTML = '<h3>Formación de mi red</h3>';
   }
@@ -1280,12 +1344,17 @@ async function verReporteRed(redId) {
 
   let html = '<h3>Reporte de ' + reporte.red + '</h3>';
 
+  html += '<p class="acciones-reporte">' + botonDescargar('/api/reportes/red/' + redId + '/csv', 'Descargar CSV') + '</p>';
+
   html += '<section class="reporte-totales">';
   html += '<div class="total total-personas"><strong>' + reporte.totalGrupos + '</strong><span>grupos</span></div>';
   html += '<div class="total total-personas"><strong>' + reporte.totalIntegrantes + '</strong><span>integrantes</span></div>';
   html += '<div class="total total-personas"><strong>' + reporte.totalReuniones + '</strong><span>reuniones</span></div>';
+  html += '<div class="total total-canceladas"><strong>' + reporte.totalCanceladas + '</strong><span>canceladas</span></div>';
+  html += '<div class="total total-visitantes"><strong>' + reporte.totalVisitantes + '</strong><span>visitas</span></div>';
   html += '<div class="total total-nuevos"><strong>' + reporte.nuevos + '</strong><span>nuevos</span></div>';
   html += '<div class="total total-bautizados"><strong>' + reporte.bautizados + '</strong><span>bautizados</span></div>';
+  html += '<div class="total total-discipulado"><strong>' + reporte.enDiscipulado + '</strong><span>en discipulado</span></div>';
   html += '</section>';
 
   html += '<h3>Grupos</h3><section id="detalle">';
@@ -1294,13 +1363,23 @@ async function verReporteRed(redId) {
     html +=
       '<article class="tarjeta tarjeta-persona">' +
       '<strong>' + grupo.nombre + '</strong>' +
-      '<span>' + grupo.integrantes + ' integrantes · ' + grupo.reuniones + ' reuniones</span>' +
+      '<span>' + grupo.integrantes + ' integrantes · ' + (grupo.reuniones - grupo.canceladas) + ' reuniones · ' +
+      grupo.canceladas + ' canceladas · ' + grupo.asistenciaPromedio + '% asistencia · ' + grupo.visitantes + ' visitas</span>' +
       '</article>';
   });
 
   html += '</section>';
   html += '<h3>Etapas de formación</h3>';
   html += barrasDeEtapas(porEtapa, cuentanEtapa === 0 ? reporte.totalIntegrantes : cuentanEtapa);
+
+  if (reporte.discipulado && reporte.discipulado.length) {
+    html += '<h3>Discipulado y Escuela Dominical</h3>';
+    html += barrasDeEtapas(reporte.discipulado, reporte.enDiscipulado || 1);
+  }
+
+  if (reporte.crecimientoPorMes && reporte.crecimientoPorMes.length) {
+    html += tablasCrecimientoPorMes(reporte.crecimientoPorMes);
+  }
 
   reporteRed.innerHTML = html;
 }
@@ -1820,6 +1899,7 @@ campoBuscarPersona.addEventListener('keydown', (evento) => {
 });
 botonCancelar.addEventListener('click', cerrarFormulario);
 formulario.addEventListener('submit', crearIntegrante);
+campoEnDiscipulado.addEventListener('change', actualizarCampoNivelDiscipulado);
 
 botonAgregarReunion.addEventListener('click', abrirFormularioReunion);
 botonCancelarReunion.addEventListener('click', cerrarFormularioReunion);

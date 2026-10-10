@@ -100,6 +100,30 @@
             <option>Anfitrión</option>
           </select>
 
+          <label for="bautizado">¿Está bautizado?</label>
+          <select id="bautizado" name="bautizado">
+            <option value="no">No</option>
+            <option value="si">Sí</option>
+          </select>
+
+          <label for="en-discipulado">¿Está en discipulado o Escuela Dominical?</label>
+          <select id="en-discipulado" name="en_discipulado">
+            <option value="no">No</option>
+            <option value="si">Sí</option>
+          </select>
+
+          <div id="campo-nivel-discipulado" class="oculto">
+            <label for="nivel-discipulado">Nivel</label>
+            <select id="nivel-discipulado" name="nivel_discipulado">
+              <option value="">Elegir nivel…</option>
+              <option>Nivel 1</option>
+              <option>Nivel 2</option>
+              <option>Nivel 3</option>
+              <option>Nivel 4</option>
+              <option>Nivel 5</option>
+            </select>
+          </div>
+
           <div id="sugerencia-duplicado" class="sugerencia oculto"></div>
           <p id="mensaje-error" class="alerta oculto"></p>
 
@@ -119,6 +143,14 @@
         <form id="formulario-reunion">
           <label for="fecha-reunion">Fecha</label>
           <input type="date" id="fecha-reunion" name="fecha" required>
+
+          <label for="tipo-reunion">Tipo</label>
+          <select id="tipo-reunion" name="tipo">
+            <option>Grupo habitual</option>
+            <option>Servicio de red</option>
+            <option>Actividad especial</option>
+            <option>Reunión cancelada</option>
+          </select>
 
           <label for="duracion-reunion">Duración</label>
           <input type="text" id="duracion-reunion" name="duracion" placeholder="Ej. 1 hora 45 minutos">
@@ -247,6 +279,7 @@
       <section id="seccion-reportes" class="oculto">
         <p id="mensaje-error-reportes" class="alerta oculto"></p>
         <div id="reporte-formacion"></div>
+        <div id="reporte-crecimiento"></div>
         <h3>Redes</h3>
         <section id="lista-mis-redes"></section>
         <div id="reporte-red"></div>

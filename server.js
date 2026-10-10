@@ -161,6 +161,14 @@ async function puedeVerRed(redId, usuario) {
   return !!pertenencia;
 }
 
+function sanearCsv(valor) {
+  const texto = String(valor ?? '');
+  if (/[";\n]/.test(texto)) {
+    return '"' + texto.replace(/"/g, '""') + '"';
+  }
+  return texto;
+}
+
 app.get('/api/personas/:id', requiereSesion, async (req, res) => {
   const personaId = Number(req.params.id);
   const persona = await db.prepare('SELECT * FROM personas WHERE id = ?').get(personaId);
@@ -270,14 +278,62 @@ app.get('/api/reportes/red/:id', requiereSesion, async (req, res) => {
   const grupos = await db.prepare('SELECT id, nombre FROM grupos WHERE red_id = ? AND activo = 1 ORDER BY nombre').all(redId);
 
   const porGrupo = [];
+  const todosLosGruposIds = [];
   for (const grupo of grupos) {
-    const integrantes = (await db.prepare('SELECT COUNT(*) AS n FROM persona_grupo WHERE grupo_id = ? AND activo = 1').get(grupo.id)).n;
-    const reuniones = (await db.prepare('SELECT COUNT(*) AS n FROM reuniones WHERE grupo_id = ?').get(grupo.id)).n;
-    porGrupo.push({ id: grupo.id, nombre: grupo.nombre, integrantes, reuniones });
+    todosLosGruposIds.push(grupo.id);
+    porGrupo.push({ id: grupo.id, nombre: grupo.nombre, integrantes: 0, reuniones: 0, canceladas: 0, asistenciaPromedio: 0, visitantes: 0 });
+  }
+
+  if (todosLosGruposIds.length) {
+    const listaIds = todosLosGruposIds.map(() => '?').join(',');
+    const filasTotales = await db.prepare(`
+      SELECT pg.grupo_id,
+             COUNT(DISTINCT pg.persona_id) AS integrantes,
+             COUNT(DISTINCT r.id) AS reuniones,
+             COUNT(DISTINCT CASE WHEN r.tipo = 'Reunión cancelada' THEN r.id END) AS canceladas,
+             COUNT(DISTINCT v.id) AS visitantes
+      FROM persona_grupo pg
+      LEFT JOIN reuniones r ON r.grupo_id = pg.grupo_id
+      LEFT JOIN visitantes v ON v.reunion_id = r.id
+      WHERE pg.grupo_id IN (${listaIds}) AND pg.activo = 1
+      GROUP BY pg.grupo_id
+    `).all(...todosLosGruposIds);
+
+    const filasAsistencia = await db.prepare(`
+      SELECT r.grupo_id,
+             COUNT(DISTINCT ar.id) AS registros,
+             COUNT(DISTINCT CASE WHEN ar.asistio = 1 THEN ar.id END) AS asistentes
+      FROM reuniones r
+      LEFT JOIN asistencia_reunion ar ON ar.reunion_id = r.id
+      WHERE r.grupo_id IN (${listaIds}) AND r.tipo != 'Reunión cancelada'
+      GROUP BY r.grupo_id
+    `).all(...todosLosGruposIds);
+
+    const mapaTotales = Object.fromEntries(filasTotales.map((f) => [f.grupo_id, f]));
+    const mapaAsistencia = Object.fromEntries(filasAsistencia.map((f) => [f.grupo_id, f]));
+
+    for (const grupo of porGrupo) {
+      const totales = mapaTotales[grupo.id];
+      const asistencia = mapaAsistencia[grupo.id];
+
+      if (totales) {
+        grupo.integrantes = totales.integrantes;
+        grupo.reuniones = totales.reuniones;
+        grupo.canceladas = totales.canceladas;
+        grupo.visitantes = totales.visitantes || 0;
+      }
+
+      const realizadas = grupo.reuniones - grupo.canceladas;
+      if (asistencia && asistencia.registros > 0) {
+        grupo.asistenciaPromedio = Math.round((asistencia.asistentes / asistencia.registros) * 100);
+      }
+    }
   }
 
   const totalIntegrantes = porGrupo.reduce((suma, grupo) => suma + grupo.integrantes, 0);
   const totalReuniones = porGrupo.reduce((suma, grupo) => suma + grupo.reuniones, 0);
+  const totalCanceladas = porGrupo.reduce((suma, grupo) => suma + grupo.canceladas, 0);
+  const totalVisitantes = porGrupo.reduce((suma, grupo) => suma + grupo.visitantes, 0);
 
   const integrantesDeLaRed = await db.prepare(`
     SELECT DISTINCT pg.persona_id
@@ -286,17 +342,78 @@ app.get('/api/reportes/red/:id', requiereSesion, async (req, res) => {
     WHERE g.red_id = ? AND g.activo = 1 AND pg.activo = 1
   `).all(redId);
 
-  const fichaPersona = db.prepare('SELECT es_nuevo, bautizado FROM personas WHERE id = ?');
+  const fichaPersona = db.prepare('SELECT es_nuevo, bautizado, en_discipulado, nivel_discipulado FROM personas WHERE id = ?');
   const etapaActiva = db.prepare('SELECT etapa FROM proceso_formacion WHERE persona_id = ? AND activo = 1');
 
   const contadorEtapas = {};
+  const contadorDiscipulado = {};
   let nuevos = 0;
   let bautizados = 0;
+  let enDiscipulado = 0;
+
+  const idsRed = [];
+  for (const fila of integrantesDeLaRed) idsRed.push(fila.persona_id);
+
+  /* Crecimiento por mes */
+  let crecimientoPorMes = [];
+
+  if (idsRed.length) {
+    const listaIds = idsRed.map(() => '?').join(',');
+    const filasIngresos = await db.prepare(`
+      SELECT substr(pg.fecha_inicio, 1, 7) AS mes, COUNT(DISTINCT pg.persona_id) AS cantidad
+      FROM persona_grupo pg
+      JOIN grupos g ON g.id = pg.grupo_id
+      WHERE g.red_id = ? AND pg.activo = 1 AND pg.fecha_inicio IS NOT NULL AND pg.fecha_inicio != ''
+      GROUP BY substr(pg.fecha_inicio, 1, 7)
+      ORDER BY mes
+    `).all(redId);
+
+    const filasBautismos = await db.prepare(`
+      SELECT substr(fecha_bautismo, 1, 7) AS mes, COUNT(*) AS cantidad
+      FROM personas
+      WHERE id IN (${listaIds}) AND bautizado = 1 AND fecha_bautismo IS NOT NULL AND fecha_bautismo != ''
+      GROUP BY substr(fecha_bautismo, 1, 7)
+      ORDER BY mes
+    `).all(...idsRed);
+
+    const filasVisitas = await db.prepare(`
+      SELECT substr(r.fecha, 1, 7) AS mes, COUNT(*) AS cantidad
+      FROM visitantes v
+      JOIN reuniones r ON r.id = v.reunion_id
+      JOIN grupos g ON g.id = r.grupo_id
+      WHERE g.red_id = ? AND r.fecha IS NOT NULL AND r.fecha != ''
+      GROUP BY substr(r.fecha, 1, 7)
+      ORDER BY mes
+    `).all(redId);
+
+    const mapaMeses = {};
+    for (const f of filasIngresos) {
+      mapaMeses[f.mes] = mapaMeses[f.mes] || { mes: f.mes, nuevos: 0, bautizados: 0, visitas: 0 };
+      mapaMeses[f.mes].nuevos = f.cantidad;
+    }
+    for (const f of filasBautismos) {
+      mapaMeses[f.mes] = mapaMeses[f.mes] || { mes: f.mes, nuevos: 0, bautizados: 0, visitas: 0 };
+      mapaMeses[f.mes].bautizados = f.cantidad;
+    }
+    for (const f of filasVisitas) {
+      mapaMeses[f.mes] = mapaMeses[f.mes] || { mes: f.mes, nuevos: 0, bautizados: 0, visitas: 0 };
+      mapaMeses[f.mes].visitas = f.cantidad;
+    }
+
+    crecimientoPorMes = Object.values(mapaMeses).sort((a, b) => (a.mes < b.mes ? -1 : 1));
+  } else {
+    crecimientoPorMes = [];
+  }
 
   for (const fila of integrantesDeLaRed) {
     const ficha = await fichaPersona.get(fila.persona_id);
     if (ficha.es_nuevo === 1) nuevos++;
     if (ficha.bautizado === 1) bautizados++;
+    if (ficha.en_discipulado === 1) {
+      enDiscipulado++;
+      const claveDiscipulado = ficha.nivel_discipulado || 'Sin nivel';
+      contadorDiscipulado[claveDiscipulado] = (contadorDiscipulado[claveDiscipulado] || 0) + 1;
+    }
 
     const etapa = await etapaActiva.get(fila.persona_id);
     const clave = etapa ? etapa.etapa : 'Sin formación';
@@ -307,16 +424,110 @@ app.get('/api/reportes/red/:id', requiereSesion, async (req, res) => {
     .map(([etapa, cantidad]) => ({ etapa, cantidad }))
     .sort((a, b) => b.cantidad - a.cantidad);
 
+  const discipulado = Object.entries(contadorDiscipulado)
+    .map(([nivel, cantidad]) => ({ etapa: nivel, cantidad }))
+    .sort((a, b) => b.cantidad - a.cantidad);
+
   res.json({
     red: red.nombre,
     totalGrupos: porGrupo.length,
     totalIntegrantes,
     totalReuniones,
+    totalCanceladas,
+    totalVisitantes,
     porGrupo,
     formacion,
+    discipulado,
+    enDiscipulado,
     nuevos,
-    bautizados
+    bautizados,
+    crecimientoPorMes
   });
+});
+
+app.get('/api/reportes/red/:id/csv', requiereSesion, async (req, res) => {
+  const redId = Number(req.params.id);
+  const red = await db.prepare('SELECT * FROM redes WHERE id = ?').get(redId);
+
+  if (!red) {
+    res.status(404).json({ error: 'Red no encontrada.' });
+    return;
+  }
+
+  if (!(await puedeVerRed(redId, req.usuario))) {
+    res.status(403).json({ error: 'No puedes consultar esta red.' });
+    return;
+  }
+
+  const grupos = await db.prepare('SELECT id, nombre FROM grupos WHERE red_id = ? AND activo = 1 ORDER BY nombre').all(redId);
+
+  let csv = '\uFEFFFFinforme de red;' + sanearCsv(red.nombre) + '\n';
+  csv += 'Grupo;Integrantes;Reuniones realizadas;Canceladas;Asistencia promedio (%);Visitantes\n';
+
+  const totalIds = grupos.map((g) => g.id);
+  const mapaIntegrantes = {};
+  const mapaReuniones = {};
+  const mapaCanceladas = {};
+  const mapaAsistencia = {};
+  const mapaVisitantes = {};
+
+  if (totalIds.length) {
+    const listaIds = totalIds.map(() => '?').join(',');
+    const filasGrupo = await db.prepare(`
+      SELECT grupo_id,
+             COUNT(DISTINCT pg.persona_id) AS integrantes
+      FROM persona_grupo pg
+      WHERE pg.grupo_id IN (${listaIds}) AND pg.activo = 1
+      GROUP BY pg.grupo_id
+    `).all(...totalIds);
+    for (const f of filasGrupo) mapaIntegrantes[f.grupo_id] = f.integrantes;
+
+    const filasReuniones = await db.prepare(`
+      SELECT grupo_id,
+             COUNT(*) AS total,
+             SUM(CASE WHEN tipo = 'Reunión cancelada' THEN 1 ELSE 0 END) AS canceladas
+      FROM reuniones
+      WHERE grupo_id IN (${listaIds})
+      GROUP BY grupo_id
+    `).all(...totalIds);
+    for (const f of filasReuniones) {
+      mapaReuniones[f.grupo_id] = f.total;
+      mapaCanceladas[f.grupo_id] = f.canceladas;
+    }
+
+    const filasAsistencia = await db.prepare(`
+      SELECT r.grupo_id, COUNT(DISTINCT ar.id) AS registros, SUM(CASE WHEN ar.asistio = 1 THEN 1 ELSE 0 END) AS asistencias
+      FROM reuniones r
+      JOIN asistencia_reunion ar ON ar.reunion_id = r.id
+      WHERE r.grupo_id IN (${listaIds}) AND r.tipo != 'Reunión cancelada'
+      GROUP BY r.grupo_id
+    `).all(...totalIds);
+    for (const f of filasAsistencia) {
+      mapaAsistencia[f.grupo_id] = f.registros ? Math.round((f.asistencias / f.registros) * 100) : 0;
+    }
+
+    const filasVisitantes = await db.prepare(`
+      SELECT r.grupo_id, COUNT(*) AS visitantes
+      FROM visitantes v
+      JOIN reuniones r ON r.id = v.reunion_id
+      WHERE r.grupo_id IN (${listaIds})
+      GROUP BY r.grupo_id
+    `).all(...totalIds);
+    for (const f of filasVisitantes) mapaVisitantes[f.grupo_id] = f.visitantes;
+  }
+
+  for (const grupo of grupos) {
+    const integrantes = mapaIntegrantes[grupo.id] || 0;
+    const reuniones = mapaReuniones[grupo.id] || 0;
+    const canceladas = mapaCanceladas[grupo.id] || 0;
+    const asistencia = mapaAsistencia[grupo.id] || 0;
+    const visitantes = mapaVisitantes[grupo.id] || 0;
+    csv += sanearCsv(grupo.nombre) + ';' + integrantes + ';' + (reuniones - canceladas) + ';' + canceladas + ';' + asistencia + ';' + visitantes + '\n';
+  }
+
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename=reporte-red-' + redId + '.csv');
+  res.send(csv);
 });
 
 app.get('/api/reportes/formacion', requiereSesion, requiereRol(['Administrador', 'Pastor']), async (req, res) => {
@@ -332,11 +543,141 @@ app.get('/api/reportes/formacion', requiereSesion, requiereRol(['Administrador',
     SELECT
       COUNT(*) AS personas,
       SUM(CASE WHEN es_nuevo = 1 THEN 1 ELSE 0 END) AS nuevos,
-      SUM(CASE WHEN bautizado = 1 THEN 1 ELSE 0 END) AS bautizados
+      SUM(CASE WHEN bautizado = 1 THEN 1 ELSE 0 END) AS bautizados,
+      SUM(CASE WHEN en_discipulado = 1 THEN 1 ELSE 0 END) AS en_discipulado
     FROM personas
   `).get();
 
   res.json({ porEtapa, resumen });
+});
+
+app.get('/api/reportes/formacion/csv', requiereSesion, requiereRol(['Administrador', 'Pastor']), async (req, res) => {
+  const porEtapa = await db.prepare(`
+    SELECT COALESCE(pf.etapa, 'Sin formación') AS etapa, COUNT(*) AS cantidad
+    FROM personas p
+    LEFT JOIN proceso_formacion pf ON pf.persona_id = p.id AND pf.activo = 1
+    GROUP BY pf.etapa
+    ORDER BY cantidad DESC
+  `).all();
+
+  const resumen = await db.prepare(`
+    SELECT
+      COUNT(*) AS personas,
+      SUM(CASE WHEN es_nuevo = 1 THEN 1 ELSE 0 END) AS nuevos,
+      SUM(CASE WHEN bautizado = 1 THEN 1 ELSE 0 END) AS bautizados,
+      SUM(CASE WHEN en_discipulado = 1 THEN 1 ELSE 0 END) AS en_discipulado
+    FROM personas
+  `).get();
+
+  let csv = '\uFEFFEtapa;Cantidad\n';
+  for (const fila of porEtapa) {
+    csv += sanearCsv(fila.etapa) + ';' + fila.cantidad + '\n';
+  }
+  csv += '\nResumen;Valor\n';
+  csv += 'Personas;' + resumen.personas + '\n';
+  csv += 'Nuevos;' + resumen.nuevos + '\n';
+  csv += 'Bautizados;' + resumen.bautizados + '\n';
+  csv += 'En discipulado;' + resumen.en_discipulado + '\n';
+
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename=reporte-formacion.csv');
+  res.send(csv);
+});
+
+app.get('/api/reportes/crecimiento', requiereSesion, requiereRol(['Administrador', 'Pastor']), async (req, res) => {
+  const porMesNuevos = await db.prepare(`
+    SELECT substr(fecha_inicio, 1, 7) AS mes, COUNT(DISTINCT persona_id) AS cantidad
+    FROM persona_grupo
+    WHERE activo = 1 AND fecha_inicio IS NOT NULL AND fecha_inicio != ''
+    GROUP BY substr(fecha_inicio, 1, 7)
+    ORDER BY mes
+  `).all();
+
+  const porMesBautizados = await db.prepare(`
+    SELECT substr(fecha_bautismo, 1, 7) AS mes, COUNT(*) AS cantidad
+    FROM personas
+    WHERE bautizado = 1 AND fecha_bautismo IS NOT NULL AND fecha_bautismo != ''
+    GROUP BY substr(fecha_bautismo, 1, 7)
+    ORDER BY mes
+  `).all();
+
+  const porMesVisitas = await db.prepare(`
+    SELECT substr(r.fecha, 1, 7) AS mes, COUNT(*) AS cantidad
+    FROM visitantes v
+    JOIN reuniones r ON r.id = v.reunion_id
+    WHERE r.fecha IS NOT NULL AND r.fecha != ''
+    GROUP BY substr(r.fecha, 1, 7)
+    ORDER BY mes
+  `).all();
+
+  const mapaMeses = {};
+  for (const f of porMesNuevos) {
+    mapaMeses[f.mes] = mapaMeses[f.mes] || { mes: f.mes, nuevos: 0, bautizados: 0, visitas: 0 };
+    mapaMeses[f.mes].nuevos = f.cantidad;
+  }
+  for (const f of porMesBautizados) {
+    mapaMeses[f.mes] = mapaMeses[f.mes] || { mes: f.mes, nuevos: 0, bautizados: 0, visitas: 0 };
+    mapaMeses[f.mes].bautizados = f.cantidad;
+  }
+  for (const f of porMesVisitas) {
+    mapaMeses[f.mes] = mapaMeses[f.mes] || { mes: f.mes, nuevos: 0, bautizados: 0, visitas: 0 };
+    mapaMeses[f.mes].visitas = f.cantidad;
+  }
+
+  const porMes = Object.values(mapaMeses).sort((a, b) => (a.mes < b.mes ? -1 : 1));
+  res.json({ porMes });
+});
+
+app.get('/api/reportes/crecimiento/csv', requiereSesion, requiereRol(['Administrador', 'Pastor']), async (req, res) => {
+  const porMesNuevos = await db.prepare(`
+    SELECT substr(fecha_inicio, 1, 7) AS mes, COUNT(DISTINCT persona_id) AS cantidad
+    FROM persona_grupo
+    WHERE activo = 1 AND fecha_inicio IS NOT NULL AND fecha_inicio != ''
+    GROUP BY substr(fecha_inicio, 1, 7)
+    ORDER BY mes
+  `).all();
+
+  const porMesBautizados = await db.prepare(`
+    SELECT substr(fecha_bautismo, 1, 7) AS mes, COUNT(*) AS cantidad
+    FROM personas
+    WHERE bautizado = 1 AND fecha_bautismo IS NOT NULL AND fecha_bautismo != ''
+    GROUP BY substr(fecha_bautismo, 1, 7)
+    ORDER BY mes
+  `).all();
+
+  const porMesVisitas = await db.prepare(`
+    SELECT substr(r.fecha, 1, 7) AS mes, COUNT(*) AS cantidad
+    FROM visitantes v
+    JOIN reuniones r ON r.id = v.reunion_id
+    WHERE r.fecha IS NOT NULL AND r.fecha != ''
+    GROUP BY substr(r.fecha, 1, 7)
+    ORDER BY mes
+  `).all();
+
+  const mapaMeses = {};
+  for (const f of porMesNuevos) {
+    mapaMeses[f.mes] = mapaMeses[f.mes] || { mes: f.mes, nuevos: 0, bautizados: 0, visitas: 0 };
+    mapaMeses[f.mes].nuevos = f.cantidad;
+  }
+  for (const f of porMesBautizados) {
+    mapaMeses[f.mes] = mapaMeses[f.mes] || { mes: f.mes, nuevos: 0, bautizados: 0, visitas: 0 };
+    mapaMeses[f.mes].bautizados = f.cantidad;
+  }
+  for (const f of porMesVisitas) {
+    mapaMeses[f.mes] = mapaMeses[f.mes] || { mes: f.mes, nuevos: 0, bautizados: 0, visitas: 0 };
+    mapaMeses[f.mes].visitas = f.cantidad;
+  }
+
+  const porMes = Object.values(mapaMeses).sort((a, b) => (a.mes < b.mes ? -1 : 1));
+
+  let csv = '\uFEFFMes;Nuevos ingresos;Bautizados;Visitas\n';
+  for (const fila of porMes) {
+    csv += fila.mes + ';' + fila.nuevos + ';' + fila.bautizados + ';' + fila.visitas + '\n';
+  }
+
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename=reporte-crecimiento.csv');
+  res.send(csv);
 });
 
 app.post('/api/redes', requiereSesion, requiereRol(['Administrador', 'Pastor']), async (req, res) => {
@@ -935,7 +1276,8 @@ app.get('/api/grupos/:id/integrantes', requiereSesion, async (req, res) => {
   }
 
   const integrantes = await db.prepare(`
-    SELECT personas.id, personas.nombre_completo, personas.cedula, personas.celular, personas.direccion, persona_grupo.rol
+    SELECT personas.id, personas.nombre_completo, personas.cedula, personas.celular, personas.direccion,
+           personas.bautizado, personas.en_discipulado, personas.nivel_discipulado, persona_grupo.rol
     FROM persona_grupo
     JOIN personas ON personas.id = persona_grupo.persona_id
     WHERE persona_grupo.grupo_id = ?
@@ -1240,6 +1582,25 @@ app.patch('/api/grupos/:id/integrantes/:personaId', requiereSesion, requiereRol(
   const cedula = req.body.cedula || null;
   const celular = req.body.celular || null;
   const direccion = req.body.direccion || null;
+  const bautizado = req.body.bautizado === undefined ? undefined : (req.body.bautizado ? 1 : 0);
+  const enDiscipulado = req.body.en_discipulado === undefined ? undefined : (req.body.en_discipulado ? 1 : 0);
+  const nivelDiscipulado = req.body.en_discipulado ? (req.body.nivel_discipulado || null) : null;
+
+  const camposPersona = ['nombre_completo = ?', 'cedula = ?', 'celular = ?', 'direccion = ?'];
+  const valoresPersona = [nombre, cedula, celular, direccion];
+
+  if (bautizado !== undefined) {
+    camposPersona.push('bautizado = ?');
+    valoresPersona.push(bautizado);
+  }
+  if (enDiscipulado !== undefined) {
+    camposPersona.push('en_discipulado = ?');
+    valoresPersona.push(enDiscipulado);
+    camposPersona.push('nivel_discipulado = ?');
+    valoresPersona.push(nivelDiscipulado);
+  }
+
+  valoresPersona.push(personaId);
 
   if (cedula) {
     const duplicado = await db.prepare(`
@@ -1256,14 +1617,14 @@ app.patch('/api/grupos/:id/integrantes/:personaId', requiereSesion, requiereRol(
   }
 
   await db.prepare(`
-    UPDATE personas SET nombre_completo = ?, cedula = ?, celular = ?, direccion = ? WHERE id = ?
-  `).run(nombre, cedula, celular, direccion, personaId);
+    UPDATE personas SET ${camposPersona.join(', ')} WHERE id = ?
+  `).run(...valoresPersona);
 
   if (rol) {
     await db.prepare('UPDATE persona_grupo SET rol = ? WHERE id = ?').run(rol, pertenencia.id);
   }
 
-  res.json({ id: personaId, nombre, cedula, celular, direccion, rol: rol || null });
+  res.json({ id: personaId, nombre, cedula, celular, direccion, bautizado, en_discipulado: enDiscipulado, nivel_discipulado: nivelDiscipulado, rol: rol || null });
 });
 
 app.post('/api/grupos/:id/integrantes', requiereSesion, requiereRol(['Administrador', 'Pastor', 'Líder de Red', 'Líder de Grupo']), async (req, res) => {
@@ -1318,6 +1679,9 @@ app.post('/api/grupos/:id/integrantes', requiereSesion, requiereRol(['Administra
   const cedula = req.body.cedula || null;
   const celular = req.body.celular || null;
   const direccion = req.body.direccion || null;
+  const bautizado = req.body.bautizado ? 1 : 0;
+  const enDiscipulado = req.body.en_discipulado ? 1 : 0;
+  const nivelDiscipulado = req.body.en_discipulado ? (req.body.nivel_discipulado || null) : null;
 
   if (!nombre) {
     res.status(400).json({ error: 'El nombre es obligatorio.' });
@@ -1347,17 +1711,17 @@ app.post('/api/grupos/:id/integrantes', requiereSesion, requiereRol(['Administra
   }
 
   const insertarPersona = db.prepare(
-    'INSERT INTO personas (nombre_completo, cedula, celular, direccion) VALUES (?, ?, ?, ?)'
+    'INSERT INTO personas (nombre_completo, cedula, celular, direccion, bautizado, en_discipulado, nivel_discipulado) VALUES (?, ?, ?, ?, ?, ?, ?)'
   );
 
   const personaId = await db.transaccion(async () => {
-    const resultado = await insertarPersona.run(nombre, cedula, celular, direccion);
+    const resultado = await insertarPersona.run(nombre, cedula, celular, direccion, bautizado, enDiscipulado, nivelDiscipulado);
     const nuevaId = Number(resultado.lastInsertRowid);
     await insertarPertenencia.run(nuevaId, grupoId, rol, hoy);
     return nuevaId;
   });
 
-  res.status(201).json({ id: personaId, nombre, cedula, celular, direccion, rol });
+  res.status(201).json({ id: personaId, nombre, cedula, celular, direccion, bautizado, en_discipulado: enDiscipulado, nivel_discipulado: nivelDiscipulado, rol });
 });
 
 app.use((err, req, res, next) => {

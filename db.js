@@ -104,9 +104,18 @@ async function transaccion(fn) {
   }
 }
 
+async function migrar() {
+  await pool.query(`
+    ALTER TABLE personas
+      ADD COLUMN IF NOT EXISTS en_discipulado INT NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS nivel_discipulado TEXT
+  `);
+}
+
 async function inicializar() {
   const schema = fs.readFileSync(path.join(__dirname, 'db', 'schema.sql'), 'utf8');
   await pool.query(schema);
+  await migrar();
   const { sembrar } = require('./db/sembrar');
   await sembrar();
 }

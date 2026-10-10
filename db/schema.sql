@@ -33,6 +33,8 @@ CREATE TABLE IF NOT EXISTS personas (
   fecha_llegada_grupo TEXT,
   bautizado INT NOT NULL DEFAULT 0,
   fecha_bautismo TEXT,
+  en_discipulado INT NOT NULL DEFAULT 0,
+  nivel_discipulado TEXT,
   es_nuevo INT NOT NULL DEFAULT 0,
   activo INT NOT NULL DEFAULT 1,
   observaciones TEXT
