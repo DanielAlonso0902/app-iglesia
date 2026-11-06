@@ -107,8 +107,33 @@ async function transaccion(fn) {
 async function migrar() {
   await pool.query(`
     ALTER TABLE personas
+      ADD COLUMN IF NOT EXISTS barrio TEXT,
+      ADD COLUMN IF NOT EXISTS fecha_nacimiento TEXT,
       ADD COLUMN IF NOT EXISTS en_discipulado INT NOT NULL DEFAULT 0,
       ADD COLUMN IF NOT EXISTS nivel_discipulado TEXT
+  `);
+
+  await pool.query(`
+    DO $$
+    DECLARE
+      nombre_constraint text;
+    BEGIN
+      SELECT conname INTO nombre_constraint
+      FROM pg_constraint
+      WHERE conrelid = 'reuniones'::regclass
+        AND contype = 'c'
+        AND pg_get_constraintdef(oid) LIKE '%Reunión cancelada%';
+
+      IF nombre_constraint IS NOT NULL THEN
+        EXECUTE format('ALTER TABLE reuniones DROP CONSTRAINT %I', nombre_constraint);
+      END IF;
+    END $$;
+
+    ALTER TABLE reuniones DROP CONSTRAINT IF EXISTS reuniones_tipo_check;
+
+    ALTER TABLE reuniones
+      ADD CONSTRAINT reuniones_tipo_check
+      CHECK (tipo IN ('Grupo habitual', 'Servicio de red', 'Servicio dominical', 'Actividad especial', 'Reunión cancelada'))
   `);
 }
 

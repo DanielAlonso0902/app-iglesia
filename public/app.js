@@ -85,6 +85,14 @@ const formularioCrearGrupoRed = document.querySelector('#formulario-crear-grupo-
 const cancelarCrearGrupoRed = document.querySelector('#cancelar-crear-grupo-red');
 const mensajeErrorCrearGrupoRed = document.querySelector('#mensaje-error-crear-grupo-red');
 
+const seccionEditarGrupo = document.querySelector('#seccion-editar-grupo');
+const formularioEditarGrupoVista = document.querySelector('#formulario-editar-grupo-vista');
+const cancelarEditarGrupoVista = document.querySelector('#cancelar-editar-grupo-vista');
+const mensajeErrorEditarGrupoVista = document.querySelector('#mensaje-error-editar-grupo-vista');
+
+const selectorMesContenedor = document.querySelector('#selector-mes-contenedor');
+const selectorMesReuniones = document.querySelector('#selector-mes-reuniones');
+
 const botonCambiarContrasena = document.querySelector('#boton-cambiar-contrasena');
 const seccionCambiarContrasena = document.querySelector('#seccion-cambiar-contrasena');
 const formularioCambiarContrasena = document.querySelector('#formulario-cambiar-contrasena');
@@ -108,6 +116,18 @@ let usuarioActual = null;
 let integrandoEditando = null;
 
 const etapasFormacion = ['Discípulo S1', 'Discípulo S2', 'Discípulo S3', 'Discípulo S4', 'Bendición N1', 'Bendición N2', 'Bendición N3', 'Ministerio de la Misericordia'];
+
+const nombresMeses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+function claveMes(fecha) {
+  return String(fecha || '').slice(0, 7);
+}
+
+function etiquetaMes(clave) {
+  const partes = clave.split('-');
+  const indice = Number(partes[1]) - 1;
+  return (nombresMeses[indice] || partes[1]) + ' ' + partes[0];
+}
 
 function clasePorEtapa(etapa) {
   if (etapa.indexOf('Discípulo') === 0) return 'discipulo';
@@ -145,7 +165,8 @@ function mostrarApp(usuario) {
   areaApp.classList.remove('oculto');
   usuarioBarra.classList.remove('oculto');
   barraNavegacion.classList.remove('oculto');
-  textoUsuario.textContent = 'Cédula ' + usuario.cedula + ' · ' + usuario.rol;
+  const identificacion = usuario.nombre_completo ? usuario.nombre_completo : 'Cédula ' + usuario.cedula;
+  textoUsuario.textContent = identificacion + ' · ' + usuario.rol;
 
   if (usuario.rol === 'Administrador' || usuario.rol === 'Pastor' || usuario.rol === 'Líder de Red') {
     botonReportes.classList.remove('oculto');
@@ -203,6 +224,7 @@ async function verGruposDeRed() {
   pantalla = 'grupos';
   botonAgregar.classList.add('oculto');
   formularioSection.classList.add('oculto');
+  seccionEditarGrupo.classList.add('oculto');
   ocultarReuniones();
 
   if (!respuesta.ok) {
@@ -242,13 +264,24 @@ async function verGruposDeRed() {
     tarjeta.className = 'tarjeta tarjeta-grupo';
     tarjeta.innerHTML =
       '<strong>' + grupo.nombre + '</strong>' +
-      '<span>' + grupo.dia_habitual + ' · ' + grupo.hora_habitual + '</span>' +
+      '<span>' + (grupo.dia_habitual || 'Sin día') + ' · ' + (grupo.hora_habitual || 'sin hora') + '</span>' +
       '<span class="direccion">' + (grupo.ciudad || '') + '</span>';
 
     tarjeta.addEventListener('click', () => {
-      grupoActual = { id: grupo.id, nombre: grupo.nombre };
+      grupoActual = grupo;
       verIntegrantesDeGrupo();
     });
+
+    if (puedeCrearGrupo) {
+      const botonEditarGrupo = document.createElement('button');
+      botonEditarGrupo.className = 'btn btn-secundario btn-mini';
+      botonEditarGrupo.textContent = 'Editar grupo';
+      botonEditarGrupo.addEventListener('click', (evento) => {
+        evento.stopPropagation();
+        abrirFormularioEditarGrupoVista(grupo);
+      });
+      tarjeta.appendChild(botonEditarGrupo);
+    }
 
     contenedorDetalle.appendChild(tarjeta);
   });
@@ -302,6 +335,83 @@ async function crearGrupoEnRed(evento) {
   await verGruposDeRed();
 }
 
+let grupoVistaEnEdicion = null;
+
+function abrirFormularioEditarGrupoVista(grupo) {
+  grupoVistaEnEdicion = grupo.id;
+  mensajeErrorEditarGrupoVista.classList.add('oculto');
+
+  const partesHora = (grupo.hora_habitual || '').split(' ');
+  const hora = partesHora[0] || '';
+  const periodo = partesHora[1] || 'PM';
+
+  formularioEditarGrupoVista.nombre.value = grupo.nombre || '';
+  formularioEditarGrupoVista.dia_habitual.value = grupo.dia_habitual || '';
+  formularioEditarGrupoVista.hora_habitual.value = hora;
+  formularioEditarGrupoVista.hora_habitual_periodo.value = periodo;
+  formularioEditarGrupoVista.duracion_habitual.value = grupo.duracion_habitual || '';
+  formularioEditarGrupoVista.direccion.value = grupo.direccion || '';
+  formularioEditarGrupoVista.barrio.value = grupo.barrio || '';
+  formularioEditarGrupoVista.ciudad.value = grupo.ciudad || '';
+  formularioEditarGrupoVista.referencia.value = grupo.referencia || '';
+
+  seccionEditarGrupo.classList.remove('oculto');
+  seccionEditarGrupo.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function cerrarFormularioEditarGrupoVista() {
+  seccionEditarGrupo.classList.add('oculto');
+  formularioEditarGrupoVista.reset();
+  grupoVistaEnEdicion = null;
+}
+
+async function guardarEdicionGrupoVista(evento) {
+  evento.preventDefault();
+  mensajeErrorEditarGrupoVista.classList.add('oculto');
+
+  const horaSeleccionada = formularioEditarGrupoVista.hora_habitual.value;
+
+  const datos = {
+    nombre: formularioEditarGrupoVista.nombre.value,
+    dia_habitual: formularioEditarGrupoVista.dia_habitual.value,
+    hora_habitual: horaSeleccionada ? horaSeleccionada + ' ' + formularioEditarGrupoVista.hora_habitual_periodo.value : '',
+    duracion_habitual: formularioEditarGrupoVista.duracion_habitual.value,
+    direccion: formularioEditarGrupoVista.direccion.value,
+    barrio: formularioEditarGrupoVista.barrio.value,
+    ciudad: formularioEditarGrupoVista.ciudad.value,
+    referencia: formularioEditarGrupoVista.referencia.value
+  };
+
+  const respuesta = await fetch('/api/grupos/' + grupoVistaEnEdicion, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(datos)
+  });
+
+  const resultado = await respuesta.json();
+
+  if (!respuesta.ok) {
+    mensajeErrorEditarGrupoVista.textContent = resultado.error;
+    mensajeErrorEditarGrupoVista.classList.remove('oculto');
+    return;
+  }
+
+  const idEditado = grupoVistaEnEdicion;
+  cerrarFormularioEditarGrupoVista();
+
+  if (pantalla === 'integrantes' && grupoActual && grupoActual.id === idEditado) {
+    const respuestaGrupo = await fetch('/api/redes/' + grupoActual.red_id + '/grupos');
+    if (respuestaGrupo.ok) {
+      const grupos = await respuestaGrupo.json();
+      const actualizado = grupos.find((g) => g.id === idEditado);
+      if (actualizado) grupoActual = actualizado;
+    }
+    await verIntegrantesDeGrupo();
+  } else {
+    await verGruposDeRed();
+  }
+}
+
 async function verIntegrantesDeGrupo() {
   const respuesta = await fetch('/api/grupos/' + grupoActual.id + '/integrantes');
   const resultado = await respuesta.json();
@@ -309,6 +419,7 @@ async function verIntegrantesDeGrupo() {
   tituloPagina.textContent = grupoActual.nombre;
   contenedorDetalle.innerHTML = '';
   seccionCrearGrupoRed.classList.add('oculto');
+  seccionEditarGrupo.classList.add('oculto');
 
   if (!respuesta.ok) {
     pantalla = 'integrantes';
@@ -331,8 +442,50 @@ async function verIntegrantesDeGrupo() {
     botonAgregar.classList.add('oculto');
   }
 
+  const datosGrupo = [];
+  if (grupoActual.dia_habitual || grupoActual.hora_habitual) {
+    datosGrupo.push((grupoActual.dia_habitual || 'Sin día') + ' · ' + (grupoActual.hora_habitual || 'sin hora'));
+  }
+  if (grupoActual.duracion_habitual) {
+    datosGrupo.push('Duración: ' + grupoActual.duracion_habitual);
+  }
+  if (grupoActual.direccion) {
+    datosGrupo.push('Dirección: ' + grupoActual.direccion);
+  }
+  if (grupoActual.barrio) {
+    datosGrupo.push('Barrio: ' + grupoActual.barrio);
+  }
+  if (grupoActual.ciudad) {
+    datosGrupo.push('Ciudad: ' + grupoActual.ciudad);
+  }
+  if (grupoActual.referencia) {
+    datosGrupo.push('Referencia: ' + grupoActual.referencia);
+  }
+
+  const tarjetaGrupo = document.createElement('article');
+  tarjetaGrupo.className = 'tarjeta tarjeta-grupo';
+  tarjetaGrupo.innerHTML =
+    '<strong>' + grupoActual.nombre + '</strong>' +
+    datosGrupo.map((dato) => '<span>' + dato + '</span>').join('');
+
+  const puedeEditarGrupo = usuarioActual && (usuarioActual.rol === 'Administrador' || usuarioActual.rol === 'Pastor' || usuarioActual.rol === 'Líder de Red');
+  if (puedeEditarGrupo) {
+    const botonEditarGrupo = document.createElement('button');
+    botonEditarGrupo.className = 'btn btn-secundario btn-mini';
+    botonEditarGrupo.textContent = 'Editar grupo';
+    botonEditarGrupo.addEventListener('click', () => {
+      abrirFormularioEditarGrupoVista(grupoActual);
+    });
+    tarjetaGrupo.appendChild(botonEditarGrupo);
+  }
+
+  contenedorDetalle.appendChild(tarjetaGrupo);
+
   if (integrantes.length === 0) {
-    contenedorDetalle.innerHTML = '<p class="vacio">Este grupo aún no tiene integrantes.</p>';
+    const vacio = document.createElement('p');
+    vacio.className = 'vacio';
+    vacio.textContent = 'Este grupo aún no tiene integrantes.';
+    contenedorDetalle.appendChild(vacio);
   }
 
   integrantes.forEach((persona) => {
@@ -403,6 +556,8 @@ async function crearIntegrante(evento) {
     cedula: formulario.cedula.value,
     celular: formulario.celular.value,
     direccion: formulario.direccion.value,
+    barrio: formulario.barrio.value,
+    fecha_nacimiento: formulario.fecha_nacimiento.value,
     rol: formulario.rol.value,
     bautizado: campoBautizado.value === 'si' ? 1 : 0,
     en_discipulado: campoEnDiscipulado.value === 'si' ? 1 : 0,
@@ -498,6 +653,8 @@ function abrirFormularioEdicion(persona) {
   formulario.cedula.value = persona.cedula || '';
   formulario.celular.value = persona.celular || '';
   formulario.direccion.value = persona.direccion || '';
+  formulario.barrio.value = persona.barrio || '';
+  formulario.fecha_nacimiento.value = persona.fecha_nacimiento || '';
   formulario.rol.value = persona.rol || 'Integrante';
   campoBautizado.value = persona.bautizado === 1 ? 'si' : 'no';
   campoEnDiscipulado.value = persona.en_discipulado === 1 ? 'si' : 'no';
@@ -687,6 +844,10 @@ async function cambiarContrasena(evento) {
   ocultarCambiarContrasena();
 }
 
+let mesReunionesSeleccionado = null;
+let reunionesCache = [];
+let gestionReunionesCache = false;
+
 function renderizarReuniones(reuniones, puedeGestionar) {
   listaReuniones.innerHTML = '';
 
@@ -698,51 +859,79 @@ function renderizarReuniones(reuniones, puedeGestionar) {
 
   if (reuniones.length === 0) {
     tituloReuniones.classList.add('oculto');
+    selectorMesContenedor.classList.add('oculto');
+    selectorMesReuniones.innerHTML = '';
     return;
   }
 
   tituloReuniones.classList.remove('oculto');
 
+  reunionesCache = reuniones;
+  gestionReunionesCache = puedeGestionar;
+
+  const claves = [];
   reuniones.forEach((reunion) => {
-    const tarjeta = document.createElement('article');
-    tarjeta.className = 'tarjeta tarjeta-grupo tarjeta-reunion';
-    tarjeta.innerHTML =
-      '<strong>' + reunion.fecha + '</strong>' +
-      '<span>' + reunion.tipo + '</span>' +
-      '<span>' + (reunion.realizada ? 'Realizada' : 'Cancelada') + ' · ' + (reunion.duracion || 'sin duración') + '</span>' +
-      (reunion.observacion ? '<span class="direccion">' + reunion.observacion + '</span>' : '');
-
-    if (puedeGestionar) {
-      const botonAsistencia = document.createElement('button');
-      botonAsistencia.className = 'btn btn-secundario';
-      botonAsistencia.textContent = 'Asistencia';
-      botonAsistencia.addEventListener('click', () => {
-        reunionActual = { id: reunion.id };
-        verDetalleReunion();
-      });
-      tarjeta.appendChild(botonAsistencia);
-
-      const botonEditar = document.createElement('button');
-      botonEditar.className = 'btn btn-secundario';
-      botonEditar.textContent = 'Editar';
-      botonEditar.addEventListener('click', () => {
-        abrirFormularioEditarReunion(reunion);
-      });
-      tarjeta.appendChild(botonEditar);
-
-      if (reunion.realizada) {
-        const botonAnular = document.createElement('button');
-        botonAnular.className = 'btn btn-borde-rojo';
-        botonAnular.textContent = 'Anular';
-        botonAnular.addEventListener('click', () => {
-          anularReunion(reunion.id);
-        });
-        tarjeta.appendChild(botonAnular);
-      }
+    const clave = claveMes(reunion.fecha);
+    if (clave && !claves.includes(clave)) {
+      claves.push(clave);
     }
-
-    listaReuniones.appendChild(tarjeta);
   });
+  claves.sort().reverse();
+
+  const hoy = new Date();
+  const claveHoy = hoy.getFullYear() + '-' + String(hoy.getMonth() + 1).padStart(2, '0');
+
+  if (!mesReunionesSeleccionado || !claves.includes(mesReunionesSeleccionado)) {
+    mesReunionesSeleccionado = claves.includes(claveHoy) ? claveHoy : claves[0];
+  }
+
+  selectorMesReuniones.innerHTML = claves.map((clave) =>
+    '<option value="' + clave + '"' + (clave === mesReunionesSeleccionado ? ' selected' : '') + '>' + etiquetaMes(clave) + '</option>'
+  ).join('');
+  selectorMesContenedor.classList.remove('oculto');
+
+  reuniones
+    .filter((reunion) => claveMes(reunion.fecha) === mesReunionesSeleccionado)
+    .forEach((reunion) => {
+      const tarjeta = document.createElement('article');
+      tarjeta.className = 'tarjeta tarjeta-grupo tarjeta-reunion';
+      tarjeta.innerHTML =
+        '<strong>' + reunion.fecha + '</strong>' +
+        '<span>' + reunion.tipo + '</span>' +
+        '<span>' + (reunion.realizada ? 'Realizada' : 'Cancelada') + ' · ' + (reunion.duracion || 'sin duración') + '</span>' +
+        (reunion.observacion ? '<span class="direccion">' + reunion.observacion + '</span>' : '');
+
+      if (puedeGestionar) {
+        const botonAsistencia = document.createElement('button');
+        botonAsistencia.className = 'btn btn-secundario';
+        botonAsistencia.textContent = 'Asistencia';
+        botonAsistencia.addEventListener('click', () => {
+          reunionActual = { id: reunion.id };
+          verDetalleReunion();
+        });
+        tarjeta.appendChild(botonAsistencia);
+
+        const botonEditar = document.createElement('button');
+        botonEditar.className = 'btn btn-secundario';
+        botonEditar.textContent = 'Editar';
+        botonEditar.addEventListener('click', () => {
+          abrirFormularioEditarReunion(reunion);
+        });
+        tarjeta.appendChild(botonEditar);
+
+        if (reunion.realizada) {
+          const botonAnular = document.createElement('button');
+          botonAnular.className = 'btn btn-borde-rojo';
+          botonAnular.textContent = 'Anular';
+          botonAnular.addEventListener('click', () => {
+            anularReunion(reunion.id);
+          });
+          tarjeta.appendChild(botonAnular);
+        }
+      }
+
+      listaReuniones.appendChild(tarjeta);
+    });
 }
 
 function ocultarReuniones() {
@@ -750,6 +939,8 @@ function ocultarReuniones() {
   formularioReunionSection.classList.add('oculto');
   formularioEditarReunionSection.classList.add('oculto');
   tituloReuniones.classList.add('oculto');
+  selectorMesContenedor.classList.add('oculto');
+  selectorMesReuniones.innerHTML = '';
   listaReuniones.innerHTML = '';
 }
 
@@ -876,6 +1067,7 @@ async function verDetalleReunion() {
   tituloPagina.textContent = 'Reunión del ' + detalle.reunion.fecha + ' · ' + detalle.reunion.tipo;
   botonAgregar.classList.add('oculto');
   formularioSection.classList.add('oculto');
+  seccionEditarGrupo.classList.add('oculto');
   ocultarReuniones();
 
   const puedeGestionar = usuarioActual && (usuarioActual.rol === 'Administrador' || usuarioActual.rol === 'Pastor' || usuarioActual.rol === 'Líder de Red' || usuarioActual.rol === 'Líder de Grupo');
@@ -1014,15 +1206,16 @@ async function pedirExpediente(personaId, nombre) {
     return;
   }
 
-  renderizarExpediente(datos.persona, datos.formacion);
+  renderizarExpediente(datos.persona, datos.formacion, datos.asistencia || []);
 }
 
-function renderizarExpediente(persona, formacion) {
+function renderizarExpediente(persona, formacion, asistencia) {
   pantalla = 'expediente';
   personaExpedienteId = persona.id;
   tituloPagina.textContent = persona.nombre_completo;
   botonAgregar.classList.add('oculto');
   formularioSection.classList.add('oculto');
+  seccionEditarGrupo.classList.add('oculto');
   ocultarReuniones();
 
   const puedeGestionar = usuarioActual && (usuarioActual.rol === 'Administrador' || usuarioActual.rol === 'Pastor' || usuarioActual.rol === 'Líder de Red' || usuarioActual.rol === 'Líder de Grupo');
@@ -1033,6 +1226,15 @@ function renderizarExpediente(persona, formacion) {
   let html = '<section class="tarjeta tarjeta-persona">';
   html += '<strong>' + persona.nombre_completo + '</strong>';
   html += '<span>Celular: ' + (persona.celular || 'no registrado') + '</span>';
+  if (persona.barrio) {
+    html += '<span>Barrio: ' + persona.barrio + '</span>';
+  }
+  if (persona.fecha_nacimiento) {
+    html += '<span>Fecha de nacimiento: ' + persona.fecha_nacimiento + '</span>';
+  }
+  if (persona.en_discipulado) {
+    html += '<span>Discipulado: Sí' + (persona.nivel_discipulado ? ' · ' + persona.nivel_discipulado : '') + '</span>';
+  }
   html += '<span>' + (persona.es_nuevo ? 'Nuevo en la iglesia' : 'Miembro') + ' · ' + (persona.bautizado ? 'Bautizado' : 'Sin bautismo') + '</span>';
   if (persona.fecha_llegada_grupo) {
     html += '<span>Llegó al grupo: ' + persona.fecha_llegada_grupo + '</span>';
@@ -1059,6 +1261,39 @@ function renderizarExpediente(persona, formacion) {
     });
   } else {
     html += '<p class="vacio">Esta persona aún no inicia su formación.</p>';
+  }
+
+  html += '<h3>Historial de asistencia</h3>';
+
+  if (asistencia.length === 0) {
+    html += '<p class="vacio">Sin registros de asistencia.</p>';
+  } else {
+    const meses = [];
+    const porMes = {};
+    asistencia.forEach((fila) => {
+      const clave = claveMes(fila.fecha);
+      if (!porMes[clave]) {
+        porMes[clave] = [];
+        meses.push(clave);
+      }
+      porMes[clave].push(fila);
+    });
+
+    meses.forEach((clave) => {
+      const filas = porMes[clave];
+      const realizadas = filas.filter((fila) => fila.realizada === 1);
+      const asistidas = realizadas.filter((fila) => fila.asistio === 1).length;
+      html += '<details class="acordeon"><summary>' + etiquetaMes(clave) + ' · ' + asistidas + '/' + realizadas.length + ' asistencias</summary><div class="contenido-acordeon">';
+      filas.forEach((fila) => {
+        const estado = fila.realizada !== 1 ? 'Cancelada' : (fila.asistio === 1 ? 'Asistió' : 'No asistió');
+        html += '<article class="tarjeta tarjeta-persona">' +
+          '<strong>' + fila.fecha + '</strong>' +
+          '<span>' + fila.grupo + ' · ' + fila.tipo + '</span>' +
+          '<span>' + estado + '</span>' +
+          '</article>';
+      });
+      html += '</div></details>';
+    });
   }
 
   if (puedeGestionar) {
@@ -1137,6 +1372,7 @@ function mostrarRedes() {
   seccionReportes.classList.add('oculto');
   seccionAdmin.classList.add('oculto');
   seccionCrearGrupoRed.classList.add('oculto');
+  seccionEditarGrupo.classList.add('oculto');
   botonAdmin.classList.remove('activo');
   botonRedes.classList.add('activo');
   botonBuscar.classList.remove('activo');
@@ -1151,6 +1387,7 @@ function mostrarBusqueda() {
   botonVolver.classList.add('oculto');
   botonAgregar.classList.add('oculto');
   formularioSection.classList.add('oculto');
+  seccionEditarGrupo.classList.add('oculto');
   ocultarReuniones();
   ocultarCambiarContrasena();
   seccionBusqueda.classList.remove('oculto');
@@ -1299,6 +1536,7 @@ async function cargarReportes() {
   seccionReportes.classList.remove('oculto');
   seccionAdmin.classList.add('oculto');
   seccionCrearGrupoRed.classList.add('oculto');
+  seccionEditarGrupo.classList.add('oculto');
   botonAdmin.classList.remove('activo');
   mensajeErrorReportes.classList.add('oculto');
   botonReportes.classList.add('activo');
@@ -1431,6 +1669,7 @@ async function cargarAdmin() {
   seccionReportes.classList.add('oculto');
   seccionAdmin.classList.remove('oculto');
   seccionCrearGrupoRed.classList.add('oculto');
+  seccionEditarGrupo.classList.add('oculto');
   mensajeErrorAdmin.classList.add('oculto');
   botonAdmin.classList.add('activo');
   botonRedes.classList.remove('activo');
@@ -1645,6 +1884,7 @@ function abrirFormularioEditarGrupo(grupo) {
   formularioEditarGrupo.direccion.value = grupo.direccion || '';
   formularioEditarGrupo.barrio.value = grupo.barrio || '';
   formularioEditarGrupo.ciudad.value = grupo.ciudad || '';
+  formularioEditarGrupo.referencia.value = grupo.referencia || '';
 
   formularioEditarGrupo.classList.remove('oculto');
   formularioEditarGrupo.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1667,7 +1907,8 @@ async function guardarEdicionGrupo(evento) {
     duracion_habitual: formularioEditarGrupo.duracion_habitual.value,
     direccion: formularioEditarGrupo.direccion.value,
     barrio: formularioEditarGrupo.barrio.value,
-    ciudad: formularioEditarGrupo.ciudad.value
+    ciudad: formularioEditarGrupo.ciudad.value,
+    referencia: formularioEditarGrupo.referencia.value
   };
 
   const respuesta = await fetch('/api/grupos/' + grupoEnEdicion, {
@@ -1951,6 +2192,12 @@ formularioNuevaRed.addEventListener('submit', crearRed);
 formularioNuevoGrupo.addEventListener('submit', crearGrupo);
 formularioCrearGrupoRed.addEventListener('submit', crearGrupoEnRed);
 cancelarCrearGrupoRed.addEventListener('click', cerrarFormularioCrearGrupoRed);
+formularioEditarGrupoVista.addEventListener('submit', guardarEdicionGrupoVista);
+cancelarEditarGrupoVista.addEventListener('click', cerrarFormularioEditarGrupoVista);
+selectorMesReuniones.addEventListener('change', () => {
+  mesReunionesSeleccionado = selectorMesReuniones.value;
+  renderizarReuniones(reunionesCache, gestionReunionesCache);
+});
 formularioUsuario.addEventListener('submit', crearUsuario);
 selectUsuarioRol.addEventListener('change', actualizarCamposUsuario);
 selectUsuarioPersona.addEventListener('change', actualizarCamposUsuario);
@@ -1985,6 +2232,11 @@ horas.forEach((h) => {
     opcionCrearRed.value = h + ':' + minuto;
     opcionCrearRed.textContent = h + ':' + minuto;
     formularioCrearGrupoRed.hora_habitual.appendChild(opcionCrearRed);
+
+    const opcionEditarVista = document.createElement('option');
+    opcionEditarVista.value = h + ':' + minuto;
+    opcionEditarVista.textContent = h + ':' + minuto;
+    formularioEditarGrupoVista.hora_habitual.appendChild(opcionEditarVista);
   });
 });
 

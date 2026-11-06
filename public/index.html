@@ -32,7 +32,6 @@
 
           <button type="submit" class="btn btn-primario boton-ancho">Entrar</button>
         </form>
-        <p class="nota-login">Prueba: cédula <strong>1000000001</strong> contraseña <strong>admin123</strong></p>
       </div>
     </section>
 
@@ -92,6 +91,12 @@
           <label for="direccion">Dirección</label>
           <input type="text" id="direccion" name="direccion">
 
+          <label for="barrio">Barrio</label>
+          <input type="text" id="barrio" name="barrio">
+
+          <label for="fecha-nacimiento">Fecha de nacimiento</label>
+          <input type="date" id="fecha-nacimiento" name="fecha_nacimiento">
+
           <label for="rol">Rol</label>
           <select id="rol" name="rol">
             <option>Integrante</option>
@@ -148,6 +153,7 @@
           <select id="tipo-reunion" name="tipo">
             <option>Grupo habitual</option>
             <option>Servicio de red</option>
+            <option>Servicio dominical</option>
             <option>Actividad especial</option>
             <option>Reunión cancelada</option>
           </select>
@@ -177,6 +183,7 @@
           <select id="editar-tipo-reunion" name="tipo">
             <option>Grupo habitual</option>
             <option>Servicio de red</option>
+            <option>Servicio dominical</option>
             <option>Actividad especial</option>
             <option>Reunión cancelada</option>
           </select>
@@ -199,6 +206,10 @@
       <details id="acordeon-reuniones" class="acordeon oculto">
         <summary>Reuniones</summary>
         <div class="contenido-acordeon">
+          <div id="selector-mes-contenedor" class="selector-mes oculto">
+            <label for="selector-mes-reuniones">Mes</label>
+            <select id="selector-mes-reuniones"></select>
+          </div>
           <section id="lista-reuniones"></section>
         </div>
       </details>
@@ -263,6 +274,57 @@
           <div class="botones">
             <button type="submit" class="btn btn-primario">Crear grupo</button>
             <button type="button" id="cancelar-crear-grupo-red" class="btn">Cancelar</button>
+          </div>
+        </form>
+      </section>
+
+      <section id="seccion-editar-grupo" class="oculto">
+        <h3>Editar grupo</h3>
+        <form id="formulario-editar-grupo-vista">
+          <label for="eg-nombre">Nombre</label>
+          <input type="text" id="eg-nombre" name="nombre" required>
+
+          <label for="eg-dia">Día habitual</label>
+          <select id="eg-dia" name="dia_habitual">
+            <option value="">Elegir día…</option>
+            <option>Lunes</option>
+            <option>Martes</option>
+            <option>Miércoles</option>
+            <option>Jueves</option>
+            <option>Viernes</option>
+            <option>Sábado</option>
+            <option>Domingo</option>
+          </select>
+
+          <label for="eg-hora">Hora habitual</label>
+          <div class="fila-hora">
+            <select id="eg-hora" name="hora_habitual"></select>
+            <select id="eg-hora-periodo" name="hora_habitual_periodo">
+              <option>AM</option>
+              <option>PM</option>
+            </select>
+          </div>
+
+          <label for="eg-duracion">Duración habitual</label>
+          <input type="text" id="eg-duracion" name="duracion_habitual" placeholder="Ej. 1 hora 45 minutos">
+
+          <label for="eg-direccion">Dirección</label>
+          <input type="text" id="eg-direccion" name="direccion">
+
+          <label for="eg-barrio">Barrio</label>
+          <input type="text" id="eg-barrio" name="barrio">
+
+          <label for="eg-ciudad">Ciudad</label>
+          <input type="text" id="eg-ciudad" name="ciudad">
+
+          <label for="eg-referencia">Punto de referencia / lugar de reunión</label>
+          <input type="text" id="eg-referencia" name="referencia">
+
+          <p id="mensaje-error-editar-grupo-vista" class="alerta oculto"></p>
+
+          <div class="botones">
+            <button type="submit" class="btn btn-primario">Guardar cambios</button>
+            <button type="button" id="cancelar-editar-grupo-vista" class="btn">Cancelar</button>
           </div>
         </form>
       </section>
@@ -403,6 +465,9 @@
 
               <label for="editar-grupo-ciudad">Ciudad</label>
               <input type="text" id="editar-grupo-ciudad" name="ciudad">
+
+              <label for="editar-grupo-referencia">Punto de referencia / lugar de reunión</label>
+              <input type="text" id="editar-grupo-referencia" name="referencia">
 
               <div class="botones">
                 <button type="submit" class="btn btn-primario">Guardar cambios</button>

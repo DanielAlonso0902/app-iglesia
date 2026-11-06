@@ -189,7 +189,16 @@ app.get('/api/personas/:id', requiereSesion, async (req, res) => {
     ORDER BY fecha_inicio, id
   `).all(personaId);
 
-  res.json({ persona, formacion });
+  const asistencia = await db.prepare(`
+    SELECT r.id, r.fecha, r.tipo, r.realizada, ar.asistio, g.nombre AS grupo
+    FROM asistencia_reunion ar
+    JOIN reuniones r ON r.id = ar.reunion_id
+    JOIN grupos g ON g.id = r.grupo_id
+    WHERE ar.persona_id = ?
+    ORDER BY r.fecha DESC
+  `).all(personaId);
+
+  res.json({ persona, formacion, asistencia });
 });
 
 app.post('/api/personas/:id/formacion/avanzar', requiereSesion, requiereRol(['Administrador', 'Pastor', 'Líder de Red', 'Líder de Grupo']), async (req, res) => {
@@ -893,11 +902,17 @@ app.patch('/api/grupos/:id/estado', requiereSesion, requiereRol(['Administrador'
   res.json({ id: grupoId, activo });
 });
 
-app.patch('/api/grupos/:id', requiereSesion, requiereRol(['Administrador', 'Pastor']), async (req, res) => {
+app.patch('/api/grupos/:id', requiereSesion, requiereRol(['Administrador', 'Pastor', 'Líder de Red']), async (req, res) => {
   const grupoId = Number(req.params.id);
+  const grupoExistente = await db.prepare('SELECT id, red_id FROM grupos WHERE id = ?').get(grupoId);
 
-  if (!(await db.prepare('SELECT id FROM grupos WHERE id = ?').get(grupoId))) {
+  if (!grupoExistente) {
     res.status(404).json({ error: 'Grupo no encontrado.' });
+    return;
+  }
+
+  if (!(await puedeVerRed(grupoExistente.red_id, req.usuario))) {
+    res.status(403).json({ error: 'Solo puedes editar grupos de tu propia red.' });
     return;
   }
 
@@ -1224,7 +1239,12 @@ app.post('/api/login', async (req, res) => {
     return;
   }
 
-  const usuario = await db.prepare('SELECT * FROM usuarios WHERE cedula = ?').get(cedula);
+  const usuario = await db.prepare(`
+    SELECT usuarios.*, personas.nombre_completo
+    FROM usuarios
+    LEFT JOIN personas ON personas.id = usuarios.persona_id
+    WHERE usuarios.cedula = ?
+  `).get(cedula);
 
   if (!usuario || usuario.activo !== 1 || !bcrypt.compareSync(contrasena, usuario.password_hash)) {
     res.status(401).json({ error: 'Cédula o contraseña incorrecta.' });
@@ -1238,11 +1258,18 @@ app.post('/api/login', async (req, res) => {
 
   const rolActual = (await db.prepare('SELECT rol FROM usuarios WHERE id = ?').get(usuario.id)).rol;
   res.cookie('sesion', token, { httpOnly: true, sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000 });
-  res.json({ id: usuario.id, cedula: usuario.cedula, rol: rolActual });
+  res.json({ id: usuario.id, cedula: usuario.cedula, rol: rolActual, nombre_completo: usuario.nombre_completo || null });
 });
 
-app.get('/api/me', requiereSesion, (req, res) => {
-  res.json({ id: req.usuario.id, cedula: req.usuario.cedula, rol: req.usuario.rol });
+app.get('/api/me', requiereSesion, async (req, res) => {
+  let nombreCompleto = null;
+
+  if (req.usuario.persona_id) {
+    const persona = await db.prepare('SELECT nombre_completo FROM personas WHERE id = ?').get(req.usuario.persona_id);
+    nombreCompleto = persona ? persona.nombre_completo : null;
+  }
+
+  res.json({ id: req.usuario.id, cedula: req.usuario.cedula, rol: req.usuario.rol, nombre_completo: nombreCompleto });
 });
 
 app.post('/api/logout', async (req, res) => {
@@ -1376,6 +1403,7 @@ app.get('/api/grupos/:id/integrantes', requiereSesion, async (req, res) => {
 
   const integrantes = await db.prepare(`
     SELECT personas.id, personas.nombre_completo, personas.cedula, personas.celular, personas.direccion,
+           personas.barrio, personas.fecha_nacimiento,
            personas.bautizado, personas.en_discipulado, personas.nivel_discipulado, persona_grupo.rol
     FROM persona_grupo
     JOIN personas ON personas.id = persona_grupo.persona_id
@@ -1464,7 +1492,7 @@ app.post('/api/grupos/:id/reuniones', requiereSesion, requiereRol(['Administrado
     return;
   }
 
-  const tiposValidos = ['Grupo habitual', 'Servicio de red', 'Actividad especial', 'Reunión cancelada'];
+  const tiposValidos = ['Grupo habitual', 'Servicio de red', 'Servicio dominical', 'Actividad especial', 'Reunión cancelada'];
   if (!tiposValidos.includes(tipo)) {
     res.status(400).json({ error: 'El tipo de reunión no es válido.' });
     return;
@@ -1503,7 +1531,7 @@ app.patch('/api/reuniones/:id', requiereSesion, requiereRol(['Administrador', 'P
     return;
   }
 
-  const tiposValidos = ['Grupo habitual', 'Servicio de red', 'Actividad especial', 'Reunión cancelada'];
+  const tiposValidos = ['Grupo habitual', 'Servicio de red', 'Servicio dominical', 'Actividad especial', 'Reunión cancelada'];
   if (!tiposValidos.includes(tipo)) {
     res.status(400).json({ error: 'El tipo de reunión no es válido.' });
     return;
@@ -1681,6 +1709,8 @@ app.patch('/api/grupos/:id/integrantes/:personaId', requiereSesion, requiereRol(
   const cedula = req.body.cedula || null;
   const celular = req.body.celular || null;
   const direccion = req.body.direccion || null;
+  const barrio = req.body.barrio === undefined ? undefined : (req.body.barrio || null);
+  const fechaNacimiento = req.body.fecha_nacimiento === undefined ? undefined : (req.body.fecha_nacimiento || null);
   const bautizado = req.body.bautizado === undefined ? undefined : (req.body.bautizado ? 1 : 0);
   const enDiscipulado = req.body.en_discipulado === undefined ? undefined : (req.body.en_discipulado ? 1 : 0);
   const nivelDiscipulado = req.body.en_discipulado ? (req.body.nivel_discipulado || null) : null;
@@ -1688,6 +1718,14 @@ app.patch('/api/grupos/:id/integrantes/:personaId', requiereSesion, requiereRol(
   const camposPersona = ['nombre_completo = ?', 'cedula = ?', 'celular = ?', 'direccion = ?'];
   const valoresPersona = [nombre, cedula, celular, direccion];
 
+  if (barrio !== undefined) {
+    camposPersona.push('barrio = ?');
+    valoresPersona.push(barrio);
+  }
+  if (fechaNacimiento !== undefined) {
+    camposPersona.push('fecha_nacimiento = ?');
+    valoresPersona.push(fechaNacimiento);
+  }
   if (bautizado !== undefined) {
     camposPersona.push('bautizado = ?');
     valoresPersona.push(bautizado);
@@ -1723,7 +1761,7 @@ app.patch('/api/grupos/:id/integrantes/:personaId', requiereSesion, requiereRol(
     await db.prepare('UPDATE persona_grupo SET rol = ? WHERE id = ?').run(rol, pertenencia.id);
   }
 
-  res.json({ id: personaId, nombre, cedula, celular, direccion, bautizado, en_discipulado: enDiscipulado, nivel_discipulado: nivelDiscipulado, rol: rol || null });
+  res.json({ id: personaId, nombre, cedula, celular, direccion, barrio, fecha_nacimiento: fechaNacimiento, bautizado, en_discipulado: enDiscipulado, nivel_discipulado: nivelDiscipulado, rol: rol || null });
 });
 
 app.post('/api/grupos/:id/integrantes', requiereSesion, requiereRol(['Administrador', 'Pastor', 'Líder de Red', 'Líder de Grupo']), async (req, res) => {
@@ -1778,6 +1816,8 @@ app.post('/api/grupos/:id/integrantes', requiereSesion, requiereRol(['Administra
   const cedula = req.body.cedula || null;
   const celular = req.body.celular || null;
   const direccion = req.body.direccion || null;
+  const barrio = req.body.barrio || null;
+  const fechaNacimiento = req.body.fecha_nacimiento || null;
   const bautizado = req.body.bautizado ? 1 : 0;
   const enDiscipulado = req.body.en_discipulado ? 1 : 0;
   const nivelDiscipulado = req.body.en_discipulado ? (req.body.nivel_discipulado || null) : null;
@@ -1810,17 +1850,17 @@ app.post('/api/grupos/:id/integrantes', requiereSesion, requiereRol(['Administra
   }
 
   const insertarPersona = db.prepare(
-    'INSERT INTO personas (nombre_completo, cedula, celular, direccion, bautizado, en_discipulado, nivel_discipulado) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    'INSERT INTO personas (nombre_completo, cedula, celular, direccion, barrio, fecha_nacimiento, bautizado, en_discipulado, nivel_discipulado) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
   );
 
   const personaId = await db.transaccion(async () => {
-    const resultado = await insertarPersona.run(nombre, cedula, celular, direccion, bautizado, enDiscipulado, nivelDiscipulado);
+    const resultado = await insertarPersona.run(nombre, cedula, celular, direccion, barrio, fechaNacimiento, bautizado, enDiscipulado, nivelDiscipulado);
     const nuevaId = Number(resultado.lastInsertRowid);
     await insertarPertenencia.run(nuevaId, grupoId, rol, hoy);
     return nuevaId;
   });
 
-  res.status(201).json({ id: personaId, nombre, cedula, celular, direccion, bautizado, en_discipulado: enDiscipulado, nivel_discipulado: nivelDiscipulado, rol });
+  res.status(201).json({ id: personaId, nombre, cedula, celular, direccion, barrio, fecha_nacimiento: fechaNacimiento, bautizado, en_discipulado: enDiscipulado, nivel_discipulado: nivelDiscipulado, rol });
 });
 
 app.use((err, req, res, next) => {
