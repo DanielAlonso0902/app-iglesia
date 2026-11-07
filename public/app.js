@@ -46,9 +46,12 @@ const resultados = document.querySelector('#resultados');
 
 const seccionReportes = document.querySelector('#seccion-reportes');
 const mensajeErrorReportes = document.querySelector('#mensaje-error-reportes');
-const reporteFormacion = document.querySelector('#reporte-formacion');
-const listaMisRedes = document.querySelector('#lista-mis-redes');
+const reporteAsistencia = document.querySelector('#reporte-asistencia');
+const selectRedReporte = document.querySelector('#select-red-reporte');
 const reporteRed = document.querySelector('#reporte-red');
+const acordeonReporteFormacion = document.querySelector('#acordeon-reporte-formacion');
+const acordeonReporteCrecimiento = document.querySelector('#acordeon-reporte-crecimiento');
+const acordeonReporteMiembros = document.querySelector('#acordeon-reporte-miembros');
 
 const botonAdmin = document.querySelector('#boton-admin');
 const seccionAdmin = document.querySelector('#seccion-admin');
@@ -1474,8 +1477,8 @@ function tablasCrecimientoPorMes(porMes) {
   ).join('');
 
   return '<h3>Crecimiento por mes</h3>' +
-    '<table class="tabla-reporte"><thead><tr><th>Mes</th><th>Nuevos</th><th>Bautizados</th><th>Visitas</th></tr></thead><tbody>' +
-    filas + '</tbody></table>';
+    '<div class="tabla-scroll"><table class="tabla-reporte"><thead><tr><th>Mes</th><th>Nuevos</th><th>Bautizados</th><th>Visitas</th></tr></thead><tbody>' +
+    filas + '</tbody></table></div>';
 }
 
 function botonDescargar(url, etiqueta) {
@@ -1500,9 +1503,9 @@ function tablaMiembros(miembros) {
     '</tr>'
   ).join('');
 
-  return '<table class="tabla-reporte"><thead><tr>' +
+  return '<div class="tabla-scroll"><table class="tabla-reporte"><thead><tr>' +
     '<th>Nombre</th><th>Cédula</th><th>Teléfono</th><th>Dirección</th><th>Bautizado</th><th>Discipulado</th><th>Grupos</th><th>Roles</th>' +
-    '</tr></thead><tbody>' + filas + '</tbody></table>';
+    '</tr></thead><tbody>' + filas + '</tbody></table></div>';
 }
 
 function barrasDeEtapas(porEtapa, totalPersonas) {
@@ -1518,6 +1521,86 @@ function barrasDeEtapas(porEtapa, totalPersonas) {
   });
 
   html += '</section>';
+  return html;
+}
+
+const TIPOS_ASISTENCIA_REUNION = ['Grupo habitual', 'Servicio de red', 'Servicio dominical', 'Actividad especial'];
+let reportesRedSolicitados = 0;
+
+function filasDeAsistencia(porTipo) {
+  return (porTipo || []).filter((fila) => fila.tipo !== 'Reunión cancelada');
+}
+
+function tablaAsistenciaPorTipo(porTipo, nota) {
+  const filas = filasDeAsistencia(porTipo);
+  const canceladas = (porTipo || []).find((fila) => fila.tipo === 'Reunión cancelada');
+
+  let html = '<p class="ayuda-reporte">' + nota + '</p>';
+
+  if (!filas.length) {
+    html += '<p class="vacio">Todavía no hay reuniones con asistencia registrada.</p>';
+    return html;
+  }
+
+  html += '<div class="tabla-scroll"><table class="tabla-reporte tabla-asistencia"><thead><tr>' +
+    '<th>Tipo de reunión</th><th>Reuniones</th><th>Asistentes</th><th>Registros</th><th>% asistencia</th><th>Visitas</th>' +
+    '</tr></thead><tbody>';
+
+  filas.forEach((fila) => {
+    html +=
+      '<tr>' +
+      '<td><strong>' + fila.tipo + '</strong></td>' +
+      '<td>' + fila.reuniones + '</td>' +
+      '<td>' + fila.asistentes + '</td>' +
+      '<td>' + fila.registros + '</td>' +
+      '<td>' + (fila.porcentaje === null ? '<span class="sin-dato">Sin registro</span>' : '<strong>' + fila.porcentaje + '%</strong>') + '</td>' +
+      '<td>' + (fila.visitantes || 0) + '</td>' +
+      '</tr>';
+  });
+
+  html += '</tbody></table></div>';
+  html += '<p class="nota-reporte">El porcentaje se calcula solo con las reuniones de ese tipo: asistentes sobre registros tomados.</p>';
+
+  if (canceladas && canceladas.reuniones > 0) {
+    html += '<p class="nota-reporte">Reuniones canceladas: ' + canceladas.reuniones + '.</p>';
+  }
+
+  return html;
+}
+
+function tablaGruposPorTipo(porGrupo) {
+  if (!porGrupo || porGrupo.length === 0) {
+    return '<p class="vacio">Esta red todavía no tiene grupos activos.</p>';
+  }
+
+  const tipos = TIPOS_ASISTENCIA_REUNION.filter((tipo) =>
+    porGrupo.some((grupo) => (grupo.porTipo || []).some((fila) => fila.tipo === tipo && fila.registros > 0))
+  );
+
+  let html = '<div class="tabla-scroll"><table class="tabla-reporte tabla-grupos"><thead><tr>' +
+    '<th>Grupo</th><th>Integrantes</th><th>Reuniones</th><th>Visitas</th>' +
+    tipos.map((tipo) => '<th>' + tipo + '</th>').join('') +
+    '</tr></thead><tbody>';
+
+  porGrupo.forEach((grupo) => {
+    html +=
+      '<tr>' +
+      '<td><strong>' + grupo.nombre + '</strong></td>' +
+      '<td>' + grupo.integrantes + '</td>' +
+      '<td>' + (grupo.reuniones - grupo.canceladas) + '</td>' +
+      '<td>' + (grupo.visitantes || 0) + '</td>';
+
+    tipos.forEach((tipo) => {
+      const fila = (grupo.porTipo || []).find((item) => item.tipo === tipo);
+      html += '<td>' + (fila && fila.porcentaje !== null ? fila.porcentaje + '%' : '<span class="sin-dato">—</span>') + '</td>';
+    });
+
+    html += '</tr>';
+  });
+
+  html += '</tbody></table></div>';
+  html += '<p class="nota-reporte">— significa que ese grupo no tiene asistencia registrada para ese tipo de reunión.</p>';
+
   return html;
 }
 
@@ -1542,78 +1625,113 @@ async function cargarReportes() {
   botonReportes.classList.add('activo');
   botonRedes.classList.remove('activo');
   botonBuscar.classList.remove('activo');
+
+  reportesRedSolicitados += 1;
+  reporteAsistencia.innerHTML = '<h3>Asistencia por tipo de reunión</h3><p class="vacio">Cargando…</p>';
   reporteRed.innerHTML = '';
-  listaMisRedes.innerHTML = '';
+  document.querySelector('#reporte-formacion').innerHTML = '';
+  document.querySelector('#reporte-crecimiento').innerHTML = '';
+  document.querySelector('#reporte-miembros').innerHTML = '';
+  selectRedReporte.innerHTML = '<option value="">Cargando…</option>';
+  selectRedReporte.disabled = true;
 
-  const crecimiento = document.querySelector('#reporte-crecimiento');
-  crecimiento.innerHTML = '';
-  const miembros = document.querySelector('#reporte-miembros');
-  miembros.innerHTML = '';
+  const esAdmin = usuarioActual.rol === 'Administrador' || usuarioActual.rol === 'Pastor';
+  acordeonReporteFormacion.classList.toggle('oculto', !esAdmin);
+  acordeonReporteCrecimiento.classList.toggle('oculto', !esAdmin);
+  acordeonReporteMiembros.classList.toggle('oculto', !esAdmin);
 
-  if (usuarioActual.rol === 'Administrador' || usuarioActual.rol === 'Pastor') {
-    const respuesta = await fetch('/api/reportes/formacion');
-    const reporte = await respuesta.json();
-    reporteFormacion.innerHTML =
-      '<h3>Formación general</h3>' +
-      fichaDeTotales(reporte.resumen) +
-      barrasDeEtapas(reporte.porEtapa, reporte.resumen.personas) +
-      '<p class="acciones-reporte">' + botonDescargar('/api/reportes/formacion/csv', 'Descargar CSV') + '</p>';
+  try {
+    const respuestaAsistencia = await fetch('/api/reportes/asistencia');
+    const asistencia = await respuestaAsistencia.json();
 
-    const respuestaCrecimiento = await fetch('/api/reportes/crecimiento');
-    const reporteCrecimiento = await respuestaCrecimiento.json();
-    crecimiento.innerHTML =
-      tablasCrecimientoPorMes(reporteCrecimiento.porMes) +
-      '<p class="acciones-reporte">' + botonDescargar('/api/reportes/crecimiento/csv', 'Descargar CSV') + '</p>';
+    if (!respuestaAsistencia.ok) {
+      throw new Error(asistencia.error || 'No se pudo cargar la asistencia.');
+    }
 
-    const respuestaMiembros = await fetch('/api/reportes/miembros');
-    const miembrosIglesia = await respuestaMiembros.json();
-    miembros.innerHTML =
-      '<h3>Miembros de la iglesia <small>(' + miembrosIglesia.length + ')</small></h3>' +
-      '<p class="acciones-reporte">' + botonDescargar('/api/reportes/miembros/csv', 'Descargar CSV') + '</p>' +
-      tablaMiembros(miembrosIglesia);
-  } else {
-    reporteFormacion.innerHTML = '<h3>Formación de mi red</h3>';
+    const notaAsistencia = esAdmin
+      ? 'Datos de toda la iglesia. Cada tipo de reunión se mide por separado: así ves si las personas están viniendo al grupo habitual, al servicio de red o al servicio dominical.'
+      : 'Estos datos incluyen únicamente tus redes. Cada tipo de reunión se mide por separado.';
+
+    reporteAsistencia.innerHTML =
+      '<h3>Asistencia por tipo de reunión</h3>' +
+      tablaAsistenciaPorTipo(asistencia.porTipo, notaAsistencia);
+
+    if (esAdmin) {
+      const [respuestaFormacion, respuestaCrecimiento, respuestaMiembros] = await Promise.all([
+        fetch('/api/reportes/formacion'),
+        fetch('/api/reportes/crecimiento'),
+        fetch('/api/reportes/miembros')
+      ]);
+
+      const formacion = await respuestaFormacion.json();
+      document.querySelector('#reporte-formacion').innerHTML =
+        fichaDeTotales(formacion.resumen) +
+        barrasDeEtapas(formacion.porEtapa, formacion.resumen.personas) +
+        '<p class="acciones-reporte">' + botonDescargar('/api/reportes/formacion/csv', 'Descargar CSV') + '</p>';
+
+      const crecimiento = await respuestaCrecimiento.json();
+      document.querySelector('#reporte-crecimiento').innerHTML =
+        tablasCrecimientoPorMes(crecimiento.porMes) +
+        '<p class="acciones-reporte">' + botonDescargar('/api/reportes/crecimiento/csv', 'Descargar CSV') + '</p>';
+
+      const miembrosIglesia = await respuestaMiembros.json();
+      document.querySelector('#reporte-miembros').innerHTML =
+        '<p class="acciones-reporte">' + botonDescargar('/api/reportes/miembros/csv', 'Descargar CSV') + '</p>' +
+        tablaMiembros(miembrosIglesia);
+    }
+
+    const respuestaRedes = await fetch('/api/mis-redes');
+    const redes = await respuestaRedes.json();
+
+    selectRedReporte.innerHTML = '';
+
+    if (!redes.length) {
+      selectRedReporte.innerHTML = '<option value="">Sin redes asignadas</option>';
+      selectRedReporte.disabled = true;
+      reporteRed.innerHTML = '<p class="vacio">No tienes redes asignadas.</p>';
+      return;
+    }
+
+    redes.forEach((red) => {
+      const opcion = document.createElement('option');
+      opcion.value = red.id;
+      opcion.textContent = red.nombre;
+      selectRedReporte.appendChild(opcion);
+    });
+
+    selectRedReporte.disabled = false;
+    await verReporteRed(redes[0].id);
+  } catch (error) {
+    mensajeErrorReportes.textContent = error.message;
+    mensajeErrorReportes.classList.remove('oculto');
+    reporteAsistencia.innerHTML = '';
+    reporteRed.innerHTML = '';
   }
-
-  const respuestaRedes = await fetch('/api/mis-redes');
-  const redes = await respuestaRedes.json();
-
-  if (redes.length === 0) {
-    listaMisRedes.innerHTML = '<p class="vacio">No tienes redes asignadas.</p>';
-    return;
-  }
-
-  redes.forEach((red) => {
-    const tarjeta = document.createElement('article');
-    tarjeta.className = 'tarjeta tarjeta-persona';
-    tarjeta.innerHTML = '<strong>' + red.nombre + '</strong>';
-
-    const boton = document.createElement('button');
-    boton.className = 'btn btn-secundario';
-    boton.textContent = 'Ver reporte';
-    boton.addEventListener('click', () => verReporteRed(red.id));
-
-    tarjeta.appendChild(boton);
-    listaMisRedes.appendChild(tarjeta);
-  });
 }
 
 async function verReporteRed(redId) {
+  const solicitud = ++reportesRedSolicitados;
   mensajeErrorReportes.classList.add('oculto');
+  reporteRed.innerHTML = '<p class="vacio">Cargando reporte de la red…</p>';
+
   const respuesta = await fetch('/api/reportes/red/' + redId);
   const reporte = await respuesta.json();
+
+  if (solicitud !== reportesRedSolicitados) {
+    return;
+  }
 
   if (!respuesta.ok) {
     mensajeErrorReportes.textContent = reporte.error;
     mensajeErrorReportes.classList.remove('oculto');
+    reporteRed.innerHTML = '';
     return;
   }
 
-  const porEtapa = reporte.formacion;
+  const porEtapa = reporte.formacion || [];
   const cuentanEtapa = porEtapa.reduce((suma, fila) => suma + fila.cantidad, 0);
 
   let html = '<h3>Reporte de ' + reporte.red + '</h3>';
-
   html += '<p class="acciones-reporte">' + botonDescargar('/api/reportes/red/' + redId + '/csv', 'Descargar CSV') + '</p>';
 
   html += '<section class="reporte-totales">';
@@ -1622,33 +1740,31 @@ async function verReporteRed(redId) {
   html += '<div class="total total-personas"><strong>' + reporte.totalReuniones + '</strong><span>reuniones</span></div>';
   html += '<div class="total total-canceladas"><strong>' + reporte.totalCanceladas + '</strong><span>canceladas</span></div>';
   html += '<div class="total total-visitantes"><strong>' + reporte.totalVisitantes + '</strong><span>visitas</span></div>';
-  html += '<div class="total total-nuevos"><strong>' + reporte.nuevos + '</strong><span>nuevos</span></div>';
-  html += '<div class="total total-bautizados"><strong>' + reporte.bautizados + '</strong><span>bautizados</span></div>';
-  html += '<div class="total total-discipulado"><strong>' + reporte.enDiscipulado + '</strong><span>en discipulado</span></div>';
   html += '</section>';
 
-  html += '<h3>Grupos</h3><section id="detalle">';
+  html += '<h4>Asistencia por tipo de reunión</h4>';
+  html += tablaAsistenciaPorTipo(reporte.porTipo, 'Porcentaje de asistencia de esta red en cada tipo de reunión.');
 
-  reporte.porGrupo.forEach((grupo) => {
-    html +=
-      '<article class="tarjeta tarjeta-persona">' +
-      '<strong>' + grupo.nombre + '</strong>' +
-      '<span>' + grupo.integrantes + ' integrantes · ' + (grupo.reuniones - grupo.canceladas) + ' reuniones · ' +
-      grupo.canceladas + ' canceladas · ' + grupo.asistenciaPromedio + '% asistencia · ' + grupo.visitantes + ' visitas</span>' +
-      '</article>';
-  });
+  html += '<h4>Grupos</h4>';
+  html += tablaGruposPorTipo(reporte.porGrupo);
 
-  html += '</section>';
-  html += '<h3>Etapas de formación</h3>';
-  html += barrasDeEtapas(porEtapa, cuentanEtapa === 0 ? reporte.totalIntegrantes : cuentanEtapa);
+  if (porEtapa.length) {
+    html += '<details class="acordeon"><summary>Formación en esta red</summary><div class="contenido-acordeon">';
+    html += barrasDeEtapas(porEtapa, cuentanEtapa === 0 ? reporte.totalIntegrantes : cuentanEtapa);
 
-  if (reporte.discipulado && reporte.discipulado.length) {
-    html += '<h3>Discipulado y Escuela Dominical</h3>';
-    html += barrasDeEtapas(reporte.discipulado, reporte.enDiscipulado || 1);
+    if (reporte.discipulado && reporte.discipulado.length) {
+      html += '<h4>Discipulado y Escuela Dominical</h4>';
+      html += '<p class="nota-reporte">En discipulado: ' + reporte.enDiscipulado + ' de ' + reporte.totalIntegrantes + ' integrantes.</p>';
+      html += barrasDeEtapas(reporte.discipulado, reporte.enDiscipulado || 1);
+    }
+
+    html += '</div></details>';
   }
 
   if (reporte.crecimientoPorMes && reporte.crecimientoPorMes.length) {
+    html += '<details class="acordeon"><summary>Crecimiento de esta red</summary><div class="contenido-acordeon">';
     html += tablasCrecimientoPorMes(reporte.crecimientoPorMes);
+    html += '</div></details>';
   }
 
   reporteRed.innerHTML = html;
@@ -2187,6 +2303,11 @@ formularioCambiarContrasena.addEventListener('submit', cambiarContrasena);
 formularioEditarReunion.addEventListener('submit', guardarEdicionReunion);
 cancelarEditarReunion.addEventListener('click', cerrarFormularioEditarReunion);
 botonReportes.addEventListener('click', cargarReportes);
+selectRedReporte.addEventListener('change', () => {
+  if (selectRedReporte.value) {
+    verReporteRed(selectRedReporte.value);
+  }
+});
 botonAdmin.addEventListener('click', cargarAdmin);
 formularioNuevaRed.addEventListener('submit', crearRed);
 formularioNuevoGrupo.addEventListener('submit', crearGrupo);

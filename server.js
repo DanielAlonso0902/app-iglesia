@@ -169,6 +169,85 @@ function sanearCsv(valor) {
   return texto;
 }
 
+const TIPOS_REUNION = ['Grupo habitual', 'Servicio de red', 'Servicio dominical', 'Actividad especial', 'Reunión cancelada'];
+
+function ordenDeTipo(tipo) {
+  const indice = TIPOS_REUNION.indexOf(tipo);
+  return indice === -1 ? 99 : indice;
+}
+
+async function calcularAsistenciaPorTipo(redIds) {
+  const filtro = redIds && redIds.length ? `AND g.red_id IN (${redIds.map(() => '?').join(',')})` : '';
+  const parametros = redIds && redIds.length ? redIds : [];
+
+  const filas = await db.prepare(`
+    SELECT r.tipo,
+           COUNT(DISTINCT r.id) AS reuniones,
+           COUNT(DISTINCT CASE WHEN ar.id IS NOT NULL THEN r.id END) AS reuniones_con_registro,
+           COUNT(DISTINCT ar.id) AS registros,
+           COUNT(DISTINCT CASE WHEN ar.asistio = 1 THEN ar.id END) AS asistentes,
+           COUNT(DISTINCT v.id) AS visitantes
+    FROM reuniones r
+    JOIN grupos g ON g.id = r.grupo_id
+    LEFT JOIN asistencia_reunion ar ON ar.reunion_id = r.id
+    LEFT JOIN visitantes v ON v.reunion_id = r.id
+    WHERE g.activo = 1 ${filtro}
+    GROUP BY r.tipo
+  `).all(...parametros);
+
+  return filas
+    .map((fila) => {
+      const registros = Number(fila.registros);
+      const asistentes = Number(fila.asistentes);
+      return {
+        tipo: fila.tipo,
+        reuniones: Number(fila.reuniones),
+        reunionesConRegistro: Number(fila.reuniones_con_registro),
+        registros,
+        asistentes,
+        porcentaje: registros > 0 ? Math.round((asistentes / registros) * 100) : null,
+        visitantes: Number(fila.visitantes)
+      };
+    })
+    .sort((a, b) => ordenDeTipo(a.tipo) - ordenDeTipo(b.tipo));
+}
+
+async function calcularAsistenciaPorGrupo(grupoIds) {
+  if (!grupoIds.length) return {};
+
+  const listaIds = grupoIds.map(() => '?').join(',');
+  const filas = await db.prepare(`
+    SELECT r.grupo_id, r.tipo,
+           COUNT(DISTINCT r.id) AS reuniones,
+           COUNT(DISTINCT ar.id) AS registros,
+           COUNT(DISTINCT CASE WHEN ar.asistio = 1 THEN ar.id END) AS asistentes
+    FROM reuniones r
+    LEFT JOIN asistencia_reunion ar ON ar.reunion_id = r.id
+    WHERE r.grupo_id IN (${listaIds})
+    GROUP BY r.grupo_id, r.tipo
+  `).all(...grupoIds);
+
+  const mapa = {};
+  for (const fila of filas) {
+    if (!mapa[fila.grupo_id]) mapa[fila.grupo_id] = [];
+    const registros = Number(fila.registros);
+    const asistentes = Number(fila.asistentes);
+    mapa[fila.grupo_id].push({
+      tipo: fila.tipo,
+      reuniones: Number(fila.reuniones),
+      registros,
+      asistentes,
+      porcentaje: registros > 0 ? Math.round((asistentes / registros) * 100) : null
+    });
+  }
+
+  for (const grupoId of Object.keys(mapa)) {
+    mapa[grupoId].sort((a, b) => ordenDeTipo(a.tipo) - ordenDeTipo(b.tipo));
+  }
+
+  return mapa;
+}
+
 app.get('/api/personas/:id', requiereSesion, async (req, res) => {
   const personaId = Number(req.params.id);
   const persona = await db.prepare('SELECT * FROM personas WHERE id = ?').get(personaId);
@@ -270,6 +349,36 @@ app.get('/api/mis-redes', requiereSesion, async (req, res) => {
   res.json(redes);
 });
 
+app.get('/api/reportes/asistencia', requiereSesion, requiereRol(['Administrador', 'Pastor', 'Líder de Red']), async (req, res) => {
+  let redIds = null;
+
+  if (req.usuario.rol === 'Líder de Red') {
+    if (!req.usuario.persona_id) {
+      res.json({ porTipo: [], totalRegistros: 0, totalAsistentes: 0, porcentaje: null });
+      return;
+    }
+
+    const filas = await db.prepare('SELECT red_id FROM persona_red WHERE persona_id = ? AND activo = 1').all(req.usuario.persona_id);
+    redIds = filas.map((fila) => fila.red_id);
+
+    if (redIds.length === 0) {
+      res.json({ porTipo: [], totalRegistros: 0, totalAsistentes: 0, porcentaje: null });
+      return;
+    }
+  }
+
+  const porTipo = await calcularAsistenciaPorTipo(redIds);
+  const totalRegistros = porTipo.reduce((suma, fila) => suma + (fila.tipo === 'Reunión cancelada' ? 0 : fila.registros), 0);
+  const totalAsistentes = porTipo.reduce((suma, fila) => suma + (fila.tipo === 'Reunión cancelada' ? 0 : fila.asistentes), 0);
+
+  res.json({
+    porTipo,
+    totalRegistros,
+    totalAsistentes,
+    porcentaje: totalRegistros > 0 ? Math.round((totalAsistentes / totalRegistros) * 100) : null
+  });
+});
+
 app.get('/api/reportes/red/:id', requiereSesion, async (req, res) => {
   const redId = Number(req.params.id);
   const red = await db.prepare('SELECT * FROM redes WHERE id = ?').get(redId);
@@ -338,6 +447,13 @@ app.get('/api/reportes/red/:id', requiereSesion, async (req, res) => {
       }
     }
   }
+
+  const asistenciaPorGrupoMapa = await calcularAsistenciaPorGrupo(todosLosGruposIds);
+  for (const grupo of porGrupo) {
+    grupo.porTipo = asistenciaPorGrupoMapa[grupo.id] || [];
+  }
+
+  const porTipo = await calcularAsistenciaPorTipo([redId]);
 
   const totalIntegrantes = porGrupo.reduce((suma, grupo) => suma + grupo.integrantes, 0);
   const totalReuniones = porGrupo.reduce((suma, grupo) => suma + grupo.reuniones, 0);
@@ -445,6 +561,7 @@ app.get('/api/reportes/red/:id', requiereSesion, async (req, res) => {
     totalCanceladas,
     totalVisitantes,
     porGrupo,
+    porTipo,
     formacion,
     discipulado,
     enDiscipulado,
@@ -470,14 +587,34 @@ app.get('/api/reportes/red/:id/csv', requiereSesion, async (req, res) => {
 
   const grupos = await db.prepare('SELECT id, nombre FROM grupos WHERE red_id = ? AND activo = 1 ORDER BY nombre').all(redId);
 
-  let csv = '\uFEFFFFinforme de red;' + sanearCsv(red.nombre) + '\n';
-  csv += 'Grupo;Integrantes;Reuniones realizadas;Canceladas;Asistencia promedio (%);Visitantes\n';
-
   const totalIds = grupos.map((g) => g.id);
+  const porTipo = await calcularAsistenciaPorTipo([redId]);
+  const asistenciaGrupoMapa = await calcularAsistenciaPorGrupo(totalIds);
+  const tiposCsv = ['Grupo habitual', 'Servicio de red', 'Servicio dominical', 'Actividad especial'];
+
+  let csv = '\uFEFFFFInforme de red;' + sanearCsv(red.nombre) + '\n\n';
+  csv += 'Asistencia por tipo de reunion\n';
+  csv += 'Tipo de reunion;Reuniones;Reuniones con asistencia registrada;Registros;Asistentes;% asistencia;Visitantes\n';
+
+  for (const fila of porTipo) {
+    csv += [
+      sanearCsv(fila.tipo),
+      fila.reuniones,
+      fila.reunionesConRegistro,
+      fila.registros,
+      fila.asistentes,
+      fila.porcentaje === null ? '' : fila.porcentaje,
+      fila.visitantes
+    ].join(';') + '\n';
+  }
+
+  csv += '\nDetalle por grupo\n';
+  csv += 'Grupo;Integrantes;Reuniones realizadas;Canceladas;Visitantes;' +
+    tiposCsv.map((tipo) => sanearCsv(tipo + ' (%)')).join(';') + '\n';
+
   const mapaIntegrantes = {};
   const mapaReuniones = {};
   const mapaCanceladas = {};
-  const mapaAsistencia = {};
   const mapaVisitantes = {};
 
   if (totalIds.length) {
@@ -504,17 +641,6 @@ app.get('/api/reportes/red/:id/csv', requiereSesion, async (req, res) => {
       mapaCanceladas[f.grupo_id] = f.canceladas;
     }
 
-    const filasAsistencia = await db.prepare(`
-      SELECT r.grupo_id, COUNT(DISTINCT ar.id) AS registros, SUM(CASE WHEN ar.asistio = 1 THEN 1 ELSE 0 END) AS asistencias
-      FROM reuniones r
-      JOIN asistencia_reunion ar ON ar.reunion_id = r.id
-      WHERE r.grupo_id IN (${listaIds}) AND r.tipo != 'Reunión cancelada'
-      GROUP BY r.grupo_id
-    `).all(...totalIds);
-    for (const f of filasAsistencia) {
-      mapaAsistencia[f.grupo_id] = f.registros ? Math.round((f.asistencias / f.registros) * 100) : 0;
-    }
-
     const filasVisitantes = await db.prepare(`
       SELECT r.grupo_id, COUNT(*) AS visitantes
       FROM visitantes v
@@ -529,9 +655,22 @@ app.get('/api/reportes/red/:id/csv', requiereSesion, async (req, res) => {
     const integrantes = mapaIntegrantes[grupo.id] || 0;
     const reuniones = mapaReuniones[grupo.id] || 0;
     const canceladas = mapaCanceladas[grupo.id] || 0;
-    const asistencia = mapaAsistencia[grupo.id] || 0;
     const visitantes = mapaVisitantes[grupo.id] || 0;
-    csv += sanearCsv(grupo.nombre) + ';' + integrantes + ';' + (reuniones - canceladas) + ';' + canceladas + ';' + asistencia + ';' + visitantes + '\n';
+    const porTipoGrupo = asistenciaGrupoMapa[grupo.id] || [];
+
+    const celdasTipo = tiposCsv.map((tipo) => {
+      const fila = porTipoGrupo.find((item) => item.tipo === tipo);
+      return fila && fila.porcentaje !== null ? fila.porcentaje : '';
+    });
+
+    csv += [
+      sanearCsv(grupo.nombre),
+      integrantes,
+      reuniones - canceladas,
+      canceladas,
+      visitantes,
+      ...celdasTipo
+    ].join(';') + '\n';
   }
 
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');

@@ -340,12 +340,31 @@
 
       <section id="seccion-reportes" class="oculto">
         <p id="mensaje-error-reportes" class="alerta oculto"></p>
-        <div id="reporte-formacion"></div>
-        <div id="reporte-crecimiento"></div>
-        <div id="reporte-miembros"></div>
-        <h3>Redes</h3>
-        <section id="lista-mis-redes"></section>
-        <div id="reporte-red"></div>
+
+        <div id="reporte-asistencia" class="panel-reporte"></div>
+
+        <div class="panel-reporte">
+          <div class="selector-reporte">
+            <label for="select-red-reporte">Elige una red</label>
+            <select id="select-red-reporte"></select>
+          </div>
+          <div id="reporte-red"></div>
+        </div>
+
+        <details class="acordeon oculto" id="acordeon-reporte-formacion">
+          <summary>Formación</summary>
+          <div class="contenido-acordeon" id="reporte-formacion"></div>
+        </details>
+
+        <details class="acordeon oculto" id="acordeon-reporte-crecimiento">
+          <summary>Crecimiento</summary>
+          <div class="contenido-acordeon" id="reporte-crecimiento"></div>
+        </details>
+
+        <details class="acordeon oculto" id="acordeon-reporte-miembros">
+          <summary>Miembros de la iglesia</summary>
+          <div class="contenido-acordeon" id="reporte-miembros"></div>
+        </details>
       </section>
 
       <section id="seccion-admin" class="oculto">

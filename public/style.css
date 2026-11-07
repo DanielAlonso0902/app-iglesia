@@ -1023,7 +1023,7 @@ details.acordeon .contenido-acordeon {
 
 .reporte-totales {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
   gap: 0.6rem;
   margin: 1rem 0;
 }
@@ -1104,6 +1104,78 @@ details.acordeon .contenido-acordeon {
 
 .acciones-reporte {
   margin: 0.75rem 0 0.5rem;
+}
+
+.panel-reporte {
+  margin-bottom: 1.25rem;
+}
+
+.panel-reporte h3,
+.panel-reporte h4 {
+  color: var(--azul-oscuro);
+}
+
+.selector-reporte {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+}
+
+.selector-reporte label {
+  font-weight: 600;
+  color: var(--texto);
+}
+
+.selector-reporte select {
+  width: 100%;
+}
+
+.ayuda-reporte,
+.nota-reporte {
+  font-size: 0.85rem;
+  color: #5c6b7a;
+  line-height: 1.45;
+}
+
+.ayuda-reporte {
+  margin-bottom: 0.75rem;
+}
+
+.nota-reporte {
+  margin-top: 0.5rem;
+}
+
+.sin-dato {
+  color: #9aa7b5;
+}
+
+.tabla-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 0.75rem;
+}
+
+.tabla-scroll .tabla-reporte {
+  box-shadow: none;
+  border-radius: 0;
+}
+
+.tabla-scroll .tabla-reporte th,
+.tabla-scroll .tabla-reporte td {
+  white-space: nowrap;
+}
+
+.tabla-asistencia {
+  min-width: 34rem;
+}
+
+.tabla-grupos {
+  min-width: 40rem;
+}
+
+#seccion-reportes details.acordeon {
+  margin-top: 0.75rem;
 }
 
 .btn-descargar {
